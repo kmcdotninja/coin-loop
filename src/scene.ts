@@ -22,7 +22,7 @@ export const FINISHES: Record<Finish, { color: string; rough: number; metal: num
   granite: { color: '#c4c3bf', rough: 0.62, metal: 0, irid: 0, stone: 'granite' },
   blackGranite: { color: '#3a3a3d', rough: 0.38, metal: 0, irid: 0, stone: 'blackGranite', label: 'Black granite' },
   marble: { color: '#ecebe7', rough: 0.28, metal: 0, irid: 0, stone: 'marble' },
-  concrete: { color: '#b9b6b0', rough: 0.95, metal: 0, irid: 0, stone: 'concrete' },
+  concrete: { color: '#c4c1bb', rough: 0.95, metal: 0, irid: 0, stone: 'concrete' },
 };
 
 /* ---------- stone, drawn in code: an albedo, a roughness and a relief map per stone ---------- */
@@ -69,14 +69,14 @@ function stoneMaps(kind: Stone) {
         rough = 0.25 + (1 - v1) * 0.2;
         h = 0.5 + (1 - v1) * -0.15;
       } else {
-        // raw cast concrete: heavy cloudy staining, aggregate grains (light and dark stones) and fine sand, rough all over;
-        // the air-bubble pits are drawn on afterwards
-        const cloud = fbm(x / 130, y / 130), stain = fbm(x / 45 + 7, y / 45), sand = n2(x / 1.4, y / 1.4);
-        const agg = n3(x / 3.2, y / 3.2), coarse = n2(x / 9 + 3, y / 9);
-        a = 0.98 + (cloud - 0.5) * 0.5 + (stain - 0.5) * 0.22 + (sand - 0.5) * 0.2;
-        if (agg > 0.8) a += 0.16; else if (agg < 0.16) a -= 0.2; // aggregate: pale and dark grains
-        rough = 0.96;
-        h = 0.5 + (sand - 0.5) * 0.45 + (coarse - 0.5) * 0.35 + (cloud - 0.5) * 0.2 + (agg > 0.8 ? 0.12 : 0);
+        // cast concrete, as in a studio shot: light cement, soft mottling, a hint of aggregate and fine sand; the surface
+        // smooth-ish and matte (the few pores are drawn on afterwards)
+        const cloud = fbm(x / 160, y / 160), stain = fbm(x / 60 + 7, y / 60), sand = n2(x / 1.4, y / 1.4);
+        const agg = n3(x / 3.2, y / 3.2);
+        a = 1.02 + (cloud - 0.5) * 0.22 + (stain - 0.5) * 0.08 + (sand - 0.5) * 0.1;
+        if (agg > 0.86) a += 0.05; else if (agg < 0.1) a -= 0.06; // aggregate, barely
+        rough = 0.93;
+        h = 0.5 + (sand - 0.5) * 0.22 + (cloud - 0.5) * 0.12;
       }
       const av = Math.max(0, Math.min(255, a * 160)), rv = Math.max(0, Math.min(255, rough * 255)), hv = Math.max(0, Math.min(255, h * 255));
       A.img.data[i] = A.img.data[i + 1] = A.img.data[i + 2] = av; A.img.data[i + 3] = 255;
@@ -86,7 +86,7 @@ function stoneMaps(kind: Stone) {
   // concrete pores: a few soft dark pits drawn on top
   for (const M of [A, R, B]) M.x.putImageData(M.img, 0, 0);
   if (kind === 'concrete') {
-    // air-bubble pits: lots of them, sunk deep; mostly small, some larger, a few gathered in clusters
+    // air-bubble pores: sparse and small, as on good cast concrete
     const pit = (x: number, y: number, rad: number) => {
       A.x.fillStyle = `rgba(38, 36, 34, ${0.55 + r() * 0.4})`;
       A.x.beginPath(); A.x.arc(x, y, rad, 0, Math.PI * 2); A.x.fill();
@@ -96,11 +96,7 @@ function stoneMaps(kind: Stone) {
       A.x.strokeStyle = 'rgba(255, 255, 255, 0.25)'; A.x.lineWidth = Math.max(0.6, rad * 0.35);
       A.x.beginPath(); A.x.arc(x + rad * 0.25, y + rad * 0.25, rad, Math.PI * 0.1, Math.PI * 0.9); A.x.stroke();
     };
-    for (let k = 0; k < 2600; k++) pit(r() * N, r() * N, 0.7 + Math.pow(r(), 3.5) * 5.5);
-    for (let c = 0; c < 26; c++) {
-      const cx = r() * N, cy = r() * N;
-      for (let k = 0; k < 14; k++) pit(cx + (r() - 0.5) * 60, cy + (r() - 0.5) * 60, 0.8 + r() * 2.6);
-    }
+    for (let k = 0; k < 320; k++) pit(r() * N, r() * N, 0.8 + Math.pow(r(), 4) * 3.2); // sparse: a few small pores
   }
   const tex = (c: HTMLCanvasElement, srgb: boolean) => { const t = new THREE.CanvasTexture(c); t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 8; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
   const out = { map: tex(A.c, true), rough: tex(R.c, false), bump: tex(B.c, false) };
@@ -489,7 +485,7 @@ export class CoinScene {
     gltf.scene.traverse((o) => {
       const m = o as THREE.Mesh;
       const key = m.name?.replace('coin_', '') ?? '';
-      if (m.isMesh && CURRENCIES.includes(key.replace('_raised', '') as Currency)) {
+      if (m.isMesh && CURRENCIES.includes(key.replace(/_(raised|slab)$/, '') as Currency)) {
         const g = m.geometry.clone();
         planarUV(g);
         this.geos.set(key, g);
@@ -529,7 +525,7 @@ export class CoinScene {
       m.roughness = THREE.MathUtils.clamp(F.rough + p.roughness, 0.05, 1) * 1.6;
       m.roughnessMap = S.rough;
       m.bumpMap = S.bump;
-      m.bumpScale = F.stone === 'concrete' ? 5.5 : 1.2; // concrete: rough and deeply pitted
+      m.bumpScale = F.stone === 'concrete' ? 1.8 : 1.2; // concrete: a soft surface, the pores sunk in
       m.anisotropy = 0;
       m.anisotropyMap = null;
       m.clearcoat = F.stone === 'marble' ? 0.35 : 0;
@@ -587,7 +583,10 @@ export class CoinScene {
       const cur = p.currencies.length ? p.currencies : (['USD'] as Currency[]);
       this.coins = Array.from({ length: p.count }, (_, i) => {
         const code = cur[i % cur.length];
-        const mesh = new THREE.Mesh((p.relief === 'raised' && this.geos.get(code + '_raised')) || this.geos.get(code)!, this.mats.get(finishes[i % finishes.length])!);
+        const fin = FINISHES[finishes[i % finishes.length]];
+        // concrete is cast, not minted: a thick block with a chunky raised symbol (coin_XXX_slab)
+        const geo = (fin.stone === 'concrete' && this.geos.get(code + '_slab')) || (p.relief === 'raised' && this.geos.get(code + '_raised')) || this.geos.get(code)!;
+        const mesh = new THREE.Mesh(geo, this.mats.get(finishes[i % finishes.length])!);
         mesh.frustumCulled = false; // ~30 coins: cheaper to draw than to risk a wrong cull
         this.ring.add(mesh);
         return mesh;
