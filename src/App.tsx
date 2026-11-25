@@ -105,6 +105,12 @@ const PRESETS: { name: string; p: Partial<CoinParams> }[] = [
   { name: 'Graphite', p: { finishes: ['graphite', 'silver'], clearcoat: 0.2, scratches: 0.5, brushed: 0.3, exposure: 1.1 } },
 ];
 
+/** Finishes that no longer exist in saved settings: Halftone and Graph became Crumpled; anything else unknown becomes Silver. */
+const fixFinishes = (c?: Partial<CoinParams>) => {
+  if (c?.finishes) c.finishes = c.finishes.map((f) => (FINISHES[f] ? f : ['halftone', 'graph'].includes(String(f)) ? 'crumpled' : 'silver')) as Finish[];
+  return c;
+};
+
 interface Saved {
   mode?: Mode;
   studio?: Partial<CoinParams>;
@@ -125,6 +131,8 @@ export default function App() {
   if ((saved.render ?? 0) < 5 && saved.landing) delete saved.landing.zoom;
   // once: glints briefly defaulted to on; that was the default, not a choice, so clear it
   if ((saved.render ?? 0) < 6) for (const k of ['studio', 'landing'] as const) delete (saved[k] as Record<string, unknown> | undefined)?.glints;
+  fixFinishes(saved.studio);
+  fixFinishes(saved.landing);
   const [mode, setMode] = useState<Mode>(saved.mode ?? 'studio');
   const [ps, setPs] = useState<Record<Mode, CoinParams>>({
     studio: { ...DEFAULTS, ...saved.studio },
@@ -139,6 +147,8 @@ export default function App() {
   const hydrated = useRef(false);
   const saveTimer = useRef<number>();
   const [savedAt, setSavedAt] = useState(0);
+  // the theme colour, settled: the scrapbook re-dyes once you stop changing it
+  const [accent, setAccent] = useState(() => themed({ ...LANDING, ...store.get<Saved>(KEY, {}).page } as LandingParams).bg);
   const panelRef = useRef<HTMLElement>(null);
   const landingHost = useRef<HTMLDivElement>(null);
   const scene = useRef<CoinScene>();
@@ -222,7 +232,8 @@ export default function App() {
 
   useEffect(() => {
     // the landing page's coins render on the page's own colour, so the photographic passes (which need an opaque frame) work there too
-    scene.current?.set(mode === 'landing' ? { ...p, background: themed(page).bg } : p);
+    // the theme's colour dyes the scrapbook paper; it arrives a moment after the last change, so dragging a colour stays smooth
+    scene.current?.set(mode === 'landing' ? { ...p, background: themed(page).bg, accent } : { ...p, accent });
     if (!hydrated.current) return; // don't save the defaults over the project file before it has been read
     const data: Saved = { mode, studio: ps.studio, landing: ps.landing, page, aspect, render: 6, at: Date.now() };
     store.set(KEY, data);
@@ -233,9 +244,13 @@ export default function App() {
         .then((r) => r.ok && setSavedAt(Date.now()))
         .catch(() => {});
     }, 400);
-  }, [p, ps, page, mode, aspect]);
+  }, [p, ps, page, mode, aspect, accent]);
 
   useEffect(() => scene.current?.setPaused(paused), [paused]);
+  useEffect(() => {
+    const t = setTimeout(() => setAccent(themed(page).bg), 250);
+    return () => clearTimeout(t);
+  }, [page]);
 
   // on load: if the project file holds newer settings than this browser, use them
   useEffect(() => {
@@ -243,6 +258,8 @@ export default function App() {
       .then((r) => (r.ok ? r.json() : {}))
       .then((f: Saved) => {
         if (f && f.at && (f.render ?? 0) < 6) for (const k of ['studio', 'landing'] as const) delete (f[k] as Record<string, unknown> | undefined)?.glints;
+        fixFinishes(f?.studio);
+        fixFinishes(f?.landing);
         if (f && f.at && (!saved.at || f.at > saved.at)) {
           if (f.mode) setMode(f.mode);
           setPs({ studio: { ...DEFAULTS, ...f.studio }, landing: { ...LANDING_COINS, ...f.landing } });
@@ -463,7 +480,7 @@ export default function App() {
               <p className="rl-note">Click a finish to make every coin that. ⌘ or Shift-click to add more to a mix, and the coins take them in turn.</p>
               <SelectRow label="Symbol" value={p.relief} options={[{ value: 'engraved', label: 'Engraved' }, { value: 'raised', label: 'Raised' }]} onChange={(v) => e({ relief: v })} />
               <SliderRow label="Roughness" value={p.roughness} min={-0.5} max={1} onChange={(v) => e({ roughness: v })} format={(v) => (v >= 0 ? '+' : '') + v.toFixed(2)} />
-              {p.finishes.some((f) => !FINISHES[f].stone && !FINISHES[f].paper) && (
+              {p.finishes.some((f) => FINISHES[f] && !FINISHES[f].stone && !FINISHES[f].paper) && (
                 <>
                   <span className="cl-sub">Metal surface</span>
                   <SliderRow label="Brushed" value={p.brushed} min={0} max={1} onChange={(v) => e({ brushed: v })} format={(v) => v.toFixed(2)} />
