@@ -105,9 +105,9 @@ const PRESETS: { name: string; p: Partial<CoinParams> }[] = [
   { name: 'Graphite', p: { finishes: ['graphite', 'silver'], clearcoat: 0.2, scratches: 0.5, brushed: 0.3, exposure: 1.1 } },
 ];
 
-/** Finishes that no longer exist in saved settings: Halftone and Graph became Crumpled; anything else unknown becomes Silver. */
+/** Finishes that no longer exist in saved settings (the papers) become concrete. */
 const fixFinishes = (c?: Partial<CoinParams>) => {
-  if (c?.finishes) c.finishes = c.finishes.map((f) => (FINISHES[f] ? f : ['halftone', 'graph'].includes(String(f)) ? 'crumpled' : 'silver')) as Finish[];
+  if (c?.finishes) c.finishes = c.finishes.map((f) => (FINISHES[f] ? f : 'concrete')) as Finish[];
   return c;
 };
 
@@ -147,8 +147,6 @@ export default function App() {
   const hydrated = useRef(false);
   const saveTimer = useRef<number>();
   const [savedAt, setSavedAt] = useState(0);
-  // the theme colour, settled: the scrapbook re-dyes once you stop changing it
-  const [accent, setAccent] = useState(() => themed({ ...LANDING, ...store.get<Saved>(KEY, {}).page } as LandingParams).bg);
   const panelRef = useRef<HTMLElement>(null);
   const landingHost = useRef<HTMLDivElement>(null);
   const scene = useRef<CoinScene>();
@@ -232,8 +230,7 @@ export default function App() {
 
   useEffect(() => {
     // the landing page's coins render on the page's own colour, so the photographic passes (which need an opaque frame) work there too
-    // the theme's colour dyes the scrapbook paper; it arrives a moment after the last change, so dragging a colour stays smooth
-    scene.current?.set(mode === 'landing' ? { ...p, background: themed(page).bg, accent } : { ...p, accent });
+    scene.current?.set(mode === 'landing' ? { ...p, background: themed(page).bg } : p);
     if (!hydrated.current) return; // don't save the defaults over the project file before it has been read
     const data: Saved = { mode, studio: ps.studio, landing: ps.landing, page, aspect, render: 6, at: Date.now() };
     store.set(KEY, data);
@@ -244,13 +241,10 @@ export default function App() {
         .then((r) => r.ok && setSavedAt(Date.now()))
         .catch(() => {});
     }, 400);
-  }, [p, ps, page, mode, aspect, accent]);
+  }, [p, ps, page, mode, aspect]);
 
   useEffect(() => scene.current?.setPaused(paused), [paused]);
-  useEffect(() => {
-    const t = setTimeout(() => setAccent(themed(page).bg), 250);
-    return () => clearTimeout(t);
-  }, [page]);
+
 
   // on load: if the project file holds newer settings than this browser, use them
   useEffect(() => {
@@ -463,11 +457,11 @@ export default function App() {
             </Group>
 
             <Group title="Finish" open={mode === 'studio'}>
-              {([['Metal', 'metal'], ['Stone', 'stone'], ['Paper', 'paper']] as const).map(([title, kind]) => (
+              {([['Metal', 'metal'], ['Stone', 'stone']] as const).map(([title, kind]) => (
                 <div key={title} className="cl-finish-set">
                   <span className="cl-sub">{title}</span>
                   <div className={`cl-chips wide ${kind !== 'metal' ? 'two' : ''}`} role="group" aria-label={`${title} finishes, cycled coin by coin`}>
-                    {(Object.keys(FINISHES) as Finish[]).filter((f) => (FINISHES[f].stone ? 'stone' : FINISHES[f].paper ? 'paper' : 'metal') === kind).map((f) => (
+                    {(Object.keys(FINISHES) as Finish[]).filter((f) => (FINISHES[f].stone ? 'stone' : 'metal') === kind).map((f) => (
                       <button key={f} className={p.finishes.includes(f) ? 'on' : ''} aria-pressed={p.finishes.includes(f)}
                         onClick={(ev) => e({ finishes: ev.metaKey || ev.shiftKey ? (toggle(p.finishes, f).length ? toggle(p.finishes, f) : [f]) : [f] })}>
                         <i style={{ background: FINISHES[f].swatch ?? FINISHES[f].color }} />
@@ -480,7 +474,7 @@ export default function App() {
               <p className="rl-note">Click a finish to make every coin that. ⌘ or Shift-click to add more to a mix, and the coins take them in turn.</p>
               <SelectRow label="Symbol" value={p.relief} options={[{ value: 'engraved', label: 'Engraved' }, { value: 'raised', label: 'Raised' }]} onChange={(v) => e({ relief: v })} />
               <SliderRow label="Roughness" value={p.roughness} min={-0.5} max={1} onChange={(v) => e({ roughness: v })} format={(v) => (v >= 0 ? '+' : '') + v.toFixed(2)} />
-              {p.finishes.some((f) => FINISHES[f] && !FINISHES[f].stone && !FINISHES[f].paper) && (
+              {p.finishes.some((f) => FINISHES[f] && !FINISHES[f].stone) && (
                 <>
                   <span className="cl-sub">Metal surface</span>
                   <SliderRow label="Brushed" value={p.brushed} min={0} max={1} onChange={(v) => e({ brushed: v })} format={(v) => v.toFixed(2)} />

@@ -10,10 +10,9 @@ import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
  */
 
 export type Stone = 'granite' | 'blackGranite' | 'marble' | 'concrete';
-export type Paper = 'crumpled' | 'newsprint' | 'kraft' | 'riso' | 'scrapbook';
-export type Finish = 'silver' | 'chrome' | 'graphite' | 'gold' | 'coral' | 'violet' | Stone | Paper;
+export type Finish = 'silver' | 'chrome' | 'graphite' | 'gold' | 'coral' | 'violet' | Stone;
 /** Metals reflect the studio; stones carry their own texture (drawn in code, see stoneMaps) and are matte. */
-export const FINISHES: Record<Finish, { color: string; rough: number; metal: number; irid: number; stone?: Stone; paper?: Paper; label?: string; swatch?: string }> = {
+export const FINISHES: Record<Finish, { color: string; rough: number; metal: number; irid: number; stone?: Stone; label?: string; swatch?: string }> = {
   silver: { color: '#d8dade', rough: 0.15, metal: 1, irid: 0 },
   chrome: { color: '#eceef2', rough: 0.05, metal: 1, irid: 0 },
   graphite: { color: '#5d6066', rough: 0.3, metal: 1, irid: 0 },
@@ -23,13 +22,7 @@ export const FINISHES: Record<Finish, { color: string; rough: number; metal: num
   granite: { color: '#c4c3bf', rough: 0.62, metal: 0, irid: 0, stone: 'granite' },
   blackGranite: { color: '#3a3a3d', rough: 0.38, metal: 0, irid: 0, stone: 'blackGranite', label: 'Black granite' },
   marble: { color: '#ecebe7', rough: 0.28, metal: 0, irid: 0, stone: 'marble' },
-  concrete: { color: '#c2beb6', rough: 0.85, metal: 0, irid: 0, stone: 'concrete' },
-  // paper: the colour lives in the printed texture (see paperMaps), so the finish colour is white
-  crumpled: { swatch: '#f2f0ec', color: '#ffffff', rough: 0.92, metal: 0, irid: 0, paper: 'crumpled' },
-  newsprint: { swatch: '#d9d4c8', color: '#ffffff', rough: 0.92, metal: 0, irid: 0, paper: 'newsprint' },
-  kraft: { swatch: '#b98b5c', color: '#ffffff', rough: 0.95, metal: 0, irid: 0, paper: 'kraft' },
-  riso: { swatch: '#ff5fa2', color: '#ffffff', rough: 0.9, metal: 0, irid: 0, paper: 'riso' },
-  scrapbook: { swatch: '#8fae7a', color: '#ffffff', rough: 0.9, metal: 0, irid: 0, paper: 'scrapbook' }, // coloured by the page theme (accent)
+  concrete: { color: '#bebbb5', rough: 0.9, metal: 0, irid: 0, stone: 'concrete' },
 };
 
 /* ---------- stone, drawn in code: an albedo, a roughness and a relief map per stone ---------- */
@@ -54,6 +47,10 @@ function stoneMaps(kind: Stone) {
   const A = mk(), R = mk(), B = mk();
   const n1 = noise2(11), n2 = noise2(23), n3 = noise2(37), r = rand(91);
   const fbm = (x: number, y: number, n = n1) => n(x, y) * 0.5 + n(x * 2.03, y * 2.03) * 0.25 + n(x * 4.1, y * 4.1) * 0.125 + n(x * 8.3, y * 8.3) * 0.0625;
+  // concrete's formwork: board edges across the sheet (110 to 170 px wide) and a tone for each board
+  const planks: number[] = [];
+  for (let x = -40; x < N + 200; x += 110 + r() * 60) planks.push(x);
+  const plankTone = planks.map(() => (r() - 0.5) * 0.12);
   for (let y = 0; y < N; y++)
     for (let x = 0; x < N; x++) {
       const i = (y * N + x) * 4;
@@ -75,12 +72,17 @@ function stoneMaps(kind: Stone) {
         rough = 0.25 + (1 - v1) * 0.2;
         h = 0.5 + (1 - v1) * -0.15;
       } else {
-        // concrete: blotchy cement, fine sand and the odd air pocket
-        const cloud = fbm(x / 120, y / 120), sand = n2(x / 1.6, y / 1.6);
-        a = 0.9 + (cloud - 0.5) * 0.35 + (sand - 0.5) * 0.18;
-        rough = 0.9;
-        h = 0.5 + (sand - 0.5) * 0.35 + (cloud - 0.5) * 0.2;
-        if (r() < 0.0009) { a *= 0.45; h = 0; }
+        // board-formed concrete: vertical formwork planks (each its own tone, wood grain pressed in), thin seams where the
+        // boards met, mottled cement and fine sand; the air-bubble pits are drawn on afterwards
+        const cloud = fbm(x / 140, y / 140), sand = n2(x / 1.6, y / 1.6);
+        let pi = 0;
+        while (pi < planks.length - 1 && x > planks[pi + 1] + Math.sin(y / 90 + pi) * 2) pi++;
+        const edge = Math.min(Math.abs(x - planks[pi] - Math.sin(y / 90 + pi) * 2), Math.abs(x - (planks[pi + 1] ?? N * 2) - Math.sin(y / 90 + pi + 1) * 2));
+        const grain = n3(x / 2.5 + pi * 13, y / 55) - 0.5; // long vertical streaks from the timber
+        a = 0.99 + plankTone[pi] * 0.6 + (cloud - 0.5) * 0.28 + (sand - 0.5) * 0.12 + grain * 0.11;
+        rough = 0.92;
+        h = 0.5 + (sand - 0.5) * 0.25 + grain * 0.22 + (cloud - 0.5) * 0.15;
+        if (edge < 1.3) { a *= 0.84; h -= 0.2; } // the seam: faint, as on real board-formed concrete
       }
       const av = Math.max(0, Math.min(255, a * 160)), rv = Math.max(0, Math.min(255, rough * 255)), hv = Math.max(0, Math.min(255, h * 255));
       A.img.data[i] = A.img.data[i + 1] = A.img.data[i + 2] = av; A.img.data[i + 3] = 255;
@@ -89,6 +91,16 @@ function stoneMaps(kind: Stone) {
     }
   // concrete pores: a few soft dark pits drawn on top
   for (const M of [A, R, B]) M.x.putImageData(M.img, 0, 0);
+  if (kind === 'concrete') {
+    // air-bubble pits: small, dark, sunk into the surface; most tiny, a few larger
+    for (let k = 0; k < 1100; k++) {
+      const x = r() * N, y = r() * N, rad = 0.6 + Math.pow(r(), 5) * 3.4; // mostly pin-pricks, the odd bigger one
+      A.x.fillStyle = `rgba(52, 50, 47, ${0.4 + r() * 0.35})`;
+      A.x.beginPath(); A.x.arc(x, y, rad, 0, Math.PI * 2); A.x.fill();
+      B.x.fillStyle = 'rgba(0, 0, 0, 0.85)';
+      B.x.beginPath(); B.x.arc(x, y, rad, 0, Math.PI * 2); B.x.fill();
+    }
+  }
   const tex = (c: HTMLCanvasElement, srgb: boolean) => { const t = new THREE.CanvasTexture(c); t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 8; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
   const out = { map: tex(A.c, true), rough: tex(R.c, false), bump: tex(B.c, false) };
   stoneCache.set(kind, out);
@@ -103,7 +115,6 @@ export interface CoinParams {
   currencies: Currency[];
   finishes: Finish[]; // cycled coin by coin
   relief: 'engraved' | 'raised'; // the symbol cut into the face, or standing up from it
-  accent?: string; // the page theme's colour: the scrapbook paper is dyed with it
   size: number;
   // path
   shape: 'ring' | 'helix' | 'dna' | 'wave' | 'infinity' | 'market' | 'orbit' | 'cradle';
@@ -431,268 +442,6 @@ export function coinsShown(p: CoinParams) {
   return Math.min(p.count, roomCache.get(key)!);
 }
 
-/* ---------- paper, printed in code: halftone dots, torn edges, type, grain ---------- */
-
-/** Newspaper comes in this many different pages, so neighbouring coins are each wrapped in their own piece. */
-export const NEWS_PAGES = 7;
-/** Scrapbook comes in this many arrangements (tears, tape, stars), one per coin in turn. */
-export const SCRAP_PAGES = 5;
-/** Pages a paper comes in, so neighbouring coins differ. */
-export const pagesOf = (paper?: Paper) => (paper === 'newsprint' ? NEWS_PAGES : paper === 'scrapbook' ? SCRAP_PAGES : 1);
-const paperCache = new Map<string, { map: THREE.Texture; rough: THREE.Texture; bump: THREE.Texture }>();
-function paperMaps(kind: Paper, variant = 0, accent = '#8fae7a') {
-  const cacheKey = `${kind}:${variant}${kind === 'scrapbook' ? ':' + accent : ''}`;
-  if (paperCache.size > 60) paperCache.clear(); // re-coloured scrapbooks pile up as the theme changes
-  if (paperCache.has(cacheKey)) return paperCache.get(cacheKey)!;
-  const N = 1024;
-  const mk = () => { const c = document.createElement('canvas'); c.width = c.height = N; return { c, g: c.getContext('2d')! }; };
-  const A = mk(), R = mk(), B = mk(); // colour, roughness (ink is a touch smoother), relief (fibres and the tear)
-  const r = rand(kind.length * 97 + 13 + variant * 7919), n1 = noise2(5 + variant);
-  const fbm = (x: number, y: number) => n1(x, y) * 0.55 + n1(x * 2.1, y * 2.1) * 0.27 + n1(x * 4.3, y * 4.3) * 0.18;
-  const papers: Record<Paper, string> = { crumpled: '#f3f1ed', newsprint: '#e9e1d0', kraft: '#b98b5c', riso: '#f3eee6', scrapbook: '#f1e8db' };
-  // crumple: a height field of tilted facets (Voronoi cells, each a small plane) crossed by sharp creases; it drives the
-  // relief and a little shading
-  const cells = Array.from({ length: 46 }, () => ({ x: r() * N, y: r() * N, gx: (r() - 0.5) * 0.9, gy: (r() - 0.5) * 0.9 }));
-  const creases = Array.from({ length: 16 }, () => { const a = r() * Math.PI; return { nx: Math.cos(a), ny: Math.sin(a), c: r() * N * 1.4 - N * 0.2, amp: (r() - 0.5) * 1.3, w: 16 + r() * 30 }; }); // broad, soft ridges, not cracks
-  const wrinkles = 11 + Math.floor(r() * 7); // how many folds fan out round a wrapped coin
-  const crumple = new Float32Array(N * N);
-  for (let y = 0; y < N; y++)
-    for (let x = 0; x < N; x++) {
-      let h = 0;
-      if (kind !== 'newsprint' && kind !== 'scrapbook') { // (those two have their own relief; skipping the facets keeps them quick)
-        let best = Infinity, cell = cells[0];
-        for (const c of cells) { const d = (x - c.x) ** 2 + (y - c.y) ** 2; if (d < best) (best = d), (cell = c); }
-        h = (x - cell.x) * cell.gx * 0.25 + (y - cell.y) * cell.gy * 0.25; // the facet's tilt
-      }
-      if (kind === 'newsprint') {
-        // wrapped round a coin: flat where it's pressed onto the face, wrinkles fanning out, crinkled where it gathers
-        const dx = x - N / 2, dy = y - N / 2, rad = Math.hypot(dx, dy) / (N / 2), ang = Math.atan2(dy, dx);
-        const out = Math.max(0, (rad - 0.35) / 0.65);
-        h = out * out * (Math.sin(ang * wrinkles + Math.sin(ang * 3 + variant) * 2.2) * 36 + Math.sin(ang * wrinkles * 2.7 + variant * 1.3) * 14);
-        h += Math.max(0, rad - 0.86) * 260 * Math.sin(ang * 90 + n1(ang * 6, rad * 4) * 4) * 0.18; // the gathered edge
-      } else for (const k of creases) { const d = Math.abs(x * k.nx + y * k.ny - k.c); h += k.amp * 12 * Math.exp(-d / k.w); } // ridges and valleys
-      crumple[y * N + x] = h;
-    }
-
-  // the sheet: its colour with soft mottling and fibres
-  const sheet = (g: CanvasRenderingContext2D, base: string, fibre: string, fibres = 900) => {
-    g.fillStyle = base;
-    g.fillRect(0, 0, N, N);
-    const img = g.getImageData(0, 0, N, N);
-    for (let y = 0; y < N; y++)
-      for (let x = 0; x < N; x++) {
-        const i = (y * N + x) * 4, m = (fbm(x / 90, y / 90) - 0.5) * 18 + (r() - 0.5) * 10;
-        img.data[i] += m; img.data[i + 1] += m; img.data[i + 2] += m;
-      }
-    g.putImageData(img, 0, 0);
-    g.strokeStyle = fibre;
-    for (let k = 0; k < fibres; k++) {
-      const x = r() * N, y = r() * N, a = r() * Math.PI * 2, l = 4 + r() * 22;
-      g.globalAlpha = 0.08 + r() * 0.18;
-      g.lineWidth = 0.6 + r() * 0.8;
-      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a + 0.6) * l * 0.5, y + Math.sin(a + 0.6) * l * 0.5, x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
-    }
-    g.globalAlpha = 1;
-  };
-  // halftone: ink dots on a 45° grid, each dot's size following a tone field (0 paper .. 1 solid)
-  const halftone = (g: CanvasRenderingContext2D, ink: string, tone: (x: number, y: number) => number, step = 13, angle = Math.PI / 4, dx = 0, dy = 0) => {
-    g.save();
-    g.fillStyle = ink;
-    const ca = Math.cos(angle), sa = Math.sin(angle);
-    for (let v = -N; v < 2 * N; v += step)
-      for (let u = -N; u < 2 * N; u += step) {
-        const x = u * ca - v * sa + dx, y = u * sa + v * ca + dy;
-        if (x < -step || y < -step || x > N + step || y > N + step) continue;
-        const t = Math.max(0, Math.min(1, tone(x, y)));
-        if (t < 0.03) continue;
-        g.beginPath(); g.arc(x, y, step * 0.72 * Math.sqrt(t), 0, Math.PI * 2); g.fill();
-      }
-    g.restore();
-  };
-  // printed lines of type in columns
-  const type = (g: CanvasRenderingContext2D, ink: string, x0: number, y0: number, w: number, h: number, size = 17) => {
-    const words = 'invest save grow capital interest yield market fund rate return shares bond growth value account balance compound dividend asset future plan'.split(' ');
-    g.save();
-    g.beginPath(); g.rect(x0, y0, w, h); g.clip();
-    g.fillStyle = ink;
-    g.font = `${size}px Georgia, 'Times New Roman', serif`;
-    for (let y = y0 + size; y < y0 + h; y += size * 1.45) {
-      let x = x0, line = '';
-      while (x < x0 + w) { const wd = words[Math.floor(r() * words.length)]; line += wd + ' '; x += g.measureText(wd + ' ').width; }
-      g.fillText(line, x0, y);
-    }
-    g.restore();
-  };
-
-  if (kind === 'crumpled') {
-    // plain paper, nothing printed: the crumple (shading and relief, below) is the whole look
-    sheet(A.g, papers.crumpled, '#b9b6b0', 300);
-  } else if (kind === 'newsprint') {
-    // a page of its own for every variant: headline, columns, a photo and rules, the whole page turned at its own angle
-    sheet(A.g, papers.newsprint, '#9a968c');
-    const g = A.g;
-    const heads = ['MARKETS RALLY', 'RATES HOLD', 'NAIRA FIRMS', 'GOLD SURGES', 'BANKS BOOM', 'SAVERS WIN', 'STOCKS SLIP', 'YIELDS RISE', 'FUNDS GROW', 'TRADE TALKS'];
-    g.save();
-    g.translate(N / 2, N / 2);
-    g.rotate((r() - 0.5) * 1.1);
-    g.translate(-N * 0.62, -N * 0.62);
-    const W = N * 1.24, ink = '#141311';
-    // masthead rule and the headline
-    g.fillStyle = ink;
-    g.fillRect(40, 70, W - 80, 4);
-    g.font = `900 ${112 + Math.floor(r() * 40)}px Georgia, 'Times New Roman', serif`;
-    const head = heads[(variant * 3 + Math.floor(r() * 3)) % heads.length];
-    g.fillText(head, 46, 180);
-    g.font = "italic 26px Georgia, 'Times New Roman', serif";
-    g.fillText(['Investors cheer as the week closes higher', 'Central bank keeps its course, for now', 'A quiet week turns into a busy one'][variant % 3], 50, 228);
-    g.fillRect(40, 250, W - 80, 2);
-    // columns of body type, with a photo set into one of them
-    const cols = 2 + (variant % 3), gap = 26, colW = (W - 80 - gap * (cols - 1)) / cols;
-    const photoCol = Math.floor(r() * cols), photoTop = 280 + r() * 380, photoH = 220 + r() * 160;
-    for (let ci = 0; ci < cols; ci++) {
-      const x0 = 40 + ci * (colW + gap);
-      if (ci) g.fillRect(x0 - gap / 2, 270, 1.2, W - 330); // the rule between columns
-      if (ci === photoCol) {
-        type(g, ink, x0, 270, colW, photoTop - 285, 21);
-        g.save(); g.beginPath(); g.rect(x0, photoTop, colW, photoH); g.clip();
-        g.fillStyle = '#d8d3c8'; g.fillRect(x0, photoTop, colW, photoH);
-        halftone(g, '#0e0d0c', (x, y) => fbm(x / 90 + variant, y / 90) * 2 - 0.5, 9);
-        g.restore();
-        g.font = "italic 13px Georgia, serif"; g.fillStyle = ink;
-        g.fillText('Traders on the floor, Friday.', x0, photoTop + photoH + 18);
-        type(g, ink, x0, photoTop + photoH + 26, colW, W - photoTop - photoH - 100, 21);
-      } else type(g, ink, x0, 270, colW, W - 330, 21);
-    }
-    g.restore();
-  } else if (kind === 'scrapbook') {
-    // a scrapbook page dyed with the theme's colour: cream graph paper, torn open to woven gingham, washi tape, doodle stars.
-    // Every variant arranges them differently.
-    const g = A.g;
-    const hex = (h: string) => { const n = parseInt(h.replace('#', ''), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
-    const mix = (c: number[], to: number[], t: number) => `rgb(${c.map((v, i) => Math.round(v + (to[i] - v) * t)).join(',')})`;
-    const base = hex(accent), dark = mix(base, [10, 12, 10], 0.55), mid = mix(base, [10, 12, 10], 0.15), light = mix(base, [246, 239, 230], 0.5); // high contrast: deep checks, clear lights
-    sheet(g, papers.scrapbook, '#c9bfb2', 260);
-    // the graph paper's grid
-    g.strokeStyle = 'rgba(120, 108, 100, 0.45)';
-    g.lineWidth = 1.2;
-    for (let k = 0; k <= N; k += 34) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k, N); g.stroke(); g.beginPath(); g.moveTo(0, k); g.lineTo(N, k); g.stroke(); }
-    // woven gingham: two-tone checks with fine threads, so it reads as cloth
-    const gingham = (gg: CanvasRenderingContext2D, cell: number) => {
-      gg.fillStyle = light; gg.fillRect(0, 0, N, N);
-      gg.globalAlpha = 0.7; gg.fillStyle = mid;
-      for (let k = 0; k * cell < N; k += 2) { gg.fillRect(k * cell, 0, cell, N); gg.fillRect(0, k * cell, N, cell); }
-      gg.globalAlpha = 1; gg.fillStyle = dark;
-      for (let i = 0; i * cell < N; i += 2) for (let j = 0; j * cell < N; j += 2) gg.fillRect(i * cell, j * cell, cell, cell);
-      gg.globalAlpha = 0.18; gg.strokeStyle = '#fff'; gg.lineWidth = 1;
-      for (let y = 0; y < N; y += 4) { gg.beginPath(); for (let x = 0; x < N; x += 6) { gg.moveTo(x, y + (x / 6) % 2); gg.lineTo(x + 3, y + (x / 6) % 2); } gg.stroke(); }
-      gg.globalAlpha = 1;
-    };
-    // a torn opening across the face: a jagged chord cutting off part of the circle; the cut-off part shows cloth
-    const tears = variant % 2 ? 2 : 1;
-    for (let ti = 0; ti < tears; ti++) {
-      const a0 = r() * Math.PI * 2 + ti * Math.PI, span = 1.5 + r() * 0.9, R0 = N * 0.47;
-      const A = [N / 2 + Math.cos(a0) * R0, N / 2 + Math.sin(a0) * R0], Bp = [N / 2 + Math.cos(a0 + span) * R0, N / 2 + Math.sin(a0 + span) * R0];
-      const pts: [number, number][] = [];
-      for (let t = 0; t <= 1.0001; t += 0.025) pts.push([A[0] + (Bp[0] - A[0]) * t + (r() - 0.5) * 16, A[1] + (Bp[1] - A[1]) * t + (r() - 0.5) * 16]);
-      g.save();
-      g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
-      for (let k = 12; k >= 0; k--) { const a = a0 + (span * k) / 12; g.lineTo(N / 2 + Math.cos(a) * N * 0.75, N / 2 + Math.sin(a) * N * 0.75); } // round the outside
-      g.closePath(); g.clip();
-      gingham(g, 40 + Math.floor(r() * 22));
-      g.restore();
-      g.strokeStyle = '#fffdf8'; g.lineJoin = 'round';
-      for (let pass = 0; pass < 2; pass++) { g.lineWidth = 7 - pass * 3; g.globalAlpha = 1 - pass * 0.3; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x + (r() - 0.5) * 3, y + (r() - 0.5) * 3) : g.moveTo(x, y))); g.stroke(); }
-      g.globalAlpha = 1;
-    }
-    // washi tape: a translucent strip of small gingham with torn ends, laid at an angle
-    g.save();
-    g.translate(N * (0.38 + r() * 0.24), N * (0.38 + r() * 0.24));
-    g.rotate((r() - 0.5) * 1.6);
-    const tw = 110, th = 300;
-    g.beginPath(); g.moveTo(-tw / 2, -th / 2);
-    for (let x = -tw / 2; x <= tw / 2; x += 10) g.lineTo(x, -th / 2 + (r() - 0.5) * 12);
-    g.lineTo(tw / 2, th / 2);
-    for (let x = tw / 2; x >= -tw / 2; x -= 10) g.lineTo(x, th / 2 + (r() - 0.5) * 12);
-    g.closePath(); g.clip();
-    g.globalAlpha = 0.82; g.translate(-N / 2, -N / 2);
-    const cell = 18;
-    g.fillStyle = light; g.fillRect(0, 0, N, N);
-    g.fillStyle = mid;
-    for (let k = 0; k * cell < N; k += 2) { g.globalAlpha = 0.45; g.fillRect(k * cell, 0, cell, N); g.fillRect(0, k * cell, N, cell); }
-    g.globalAlpha = 1;
-    g.restore();
-    // doodle stars: wobbly, hand-cut, with a light inner line
-    const star = (x: number, y: number, R: number, rot: number) => {
-      const path = (scale: number) => { g.beginPath(); for (let k = 0; k <= 10; k++) { const ang = rot + (k * Math.PI) / 5, rr = (k % 2 ? R * 0.46 : R) * scale * (0.9 + r() * 0.2); k ? g.lineTo(x + Math.cos(ang) * rr, y + Math.sin(ang) * rr) : g.moveTo(x + Math.cos(ang) * rr, y + Math.sin(ang) * rr); } g.closePath(); };
-      path(1); g.fillStyle = mid; g.fill();
-      path(0.62); g.strokeStyle = light; g.lineWidth = 5; g.lineJoin = 'round'; g.stroke();
-    };
-    for (let k = 0; k < 1 + (variant % 2); k++) { const a = r() * Math.PI * 2, d = N * (0.12 + r() * 0.2); star(N / 2 + Math.cos(a) * d, N / 2 + Math.sin(a) * d, 60 + r() * 40, r() * Math.PI); } // inside the face
-  } else if (kind === 'kraft') {
-    sheet(A.g, papers.kraft, '#5c3d22', 2600);
-    halftone(A.g, '#1f140c', (x, y) => (y / N) * 1.3 - 0.25 + (fbm(x / 160, y / 160) - 0.5) * 0.6, 22);
-  } else {
-    sheet(A.g, papers.riso, '#a9a39a');
-    // two inks, each its own halftone angle, slightly out of register
-    A.g.globalCompositeOperation = 'multiply';
-    halftone(A.g, '#ff5fa2', (x, y) => 1.1 - Math.hypot(x - N * 0.35, y - N * 0.4) / (N * 0.5), 12, Math.PI / 12);
-    halftone(A.g, '#3a6cff', (x, y) => 1.05 - Math.hypot(x - N * 0.62, y - N * 0.58) / (N * 0.5), 12, Math.PI / 4, 5, 3);
-    A.g.globalCompositeOperation = 'source-over';
-  }
-  // the cut: a white margin of paper core round the face, its inner edge a little uneven as scissors leave it
-  {
-    const g = A.g;
-    g.save();
-    g.beginPath();
-    for (let k = 0; k <= 180; k++) {
-      const a = (k / 180) * Math.PI * 2, rr = N * (0.415 + (n1(Math.cos(a) * 3 + variant, Math.sin(a) * 3) - 0.5) * 0.012);
-      k ? g.lineTo(N / 2 + Math.cos(a) * rr, N / 2 + Math.sin(a) * rr) : g.moveTo(N / 2 + Math.cos(a) * rr, N / 2 + Math.sin(a) * rr);
-    }
-    g.closePath();
-    g.rect(N, 0, -N, N); // everything outside that circle (even-odd)
-    g.fillStyle = '#fbfaf6';
-    g.fill('evenodd');
-    // a hairline where the print meets the cut, so the edge reads crisp
-    g.globalCompositeOperation = 'multiply';
-    g.strokeStyle = 'rgba(0,0,0,0.25)';
-    g.lineWidth = 1.5;
-    g.beginPath(); g.arc(N / 2, N / 2, N * 0.415, 0, Math.PI * 2); g.stroke();
-    g.restore();
-  }
-  // roughness: paper is matte; ink (darker) a touch smoother
-  const ai = A.g.getImageData(0, 0, N, N), ri = R.g.createImageData(N, N);
-  for (let i = 0; i < ai.data.length; i += 4) {
-    const lum = (ai.data[i] + ai.data[i + 1] + ai.data[i + 2]) / 765;
-    const v = 200 + lum * 50;
-    ri.data[i] = ri.data[i + 1] = ri.data[i + 2] = v; ri.data[i + 3] = 255;
-  }
-  R.g.putImageData(ri, 0, 0);
-  // shading: valleys of the crumple a touch darker, as soft light across a creased sheet
-  const strength = kind === 'crumpled' ? 1.8 : kind === 'newsprint' ? 1.2 : kind === 'scrapbook' ? 0.4 : 0.55; // crumpled paper hard, newspaper wrapped, the others gently
-  const ap = A.g.getImageData(0, 0, N, N);
-  for (let y = 1; y < N; y++)
-    for (let x = 1; x < N; x++) {
-      const i = (y * N + x) * 4;
-      const xm = Math.max(0, x - 3), ym = Math.max(0, y - 3);
-      const slope = (crumple[y * N + x] - crumple[y * N + xm] + crumple[y * N + x] - crumple[ym * N + x]) * 3.5 * strength; // lit from the top left
-      ap.data[i] += slope; ap.data[i + 1] += slope; ap.data[i + 2] += slope;
-    }
-  A.g.putImageData(ap, 0, 0);
-  // relief: the crumple's facets and creases, plus fibres and grain
-  const bi = B.g.createImageData(N, N);
-  for (let y = 0; y < N; y++)
-    for (let x = 0; x < N; x++) {
-      const i = (y * N + x) * 4;
-      const v = 128 + crumple[y * N + x] * 3.2 * strength + (fbm(x / 6, y / 6) - 0.5) * 26 + (r() - 0.5) * 10;
-      bi.data[i] = bi.data[i + 1] = bi.data[i + 2] = v; bi.data[i + 3] = 255;
-    }
-  B.g.putImageData(bi, 0, 0);
-  const tex = (c: HTMLCanvasElement, srgb: boolean) => { const t = new THREE.CanvasTexture(c); t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 8; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
-  const out = { map: tex(A.c, true), rough: tex(R.c, false), bump: tex(B.c, false) };
-  paperCache.set(cacheKey, out);
-  return out;
-}
-
 /* ---------- the scene ---------- */
 
 export class CoinScene {
@@ -712,8 +461,6 @@ export class CoinScene {
   private raf = 0;
   private paused = false;
   private disposed = false;
-  private shadows: (THREE.Mesh | undefined)[] = []; // paper coins' cut-out drop shadows
-  private shadowMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.3, depthWrite: false });
   /** seconds into the loop; set by the recorder so frames come out exactly once per loop */
   clock?: () => number;
   ready: Promise<void>;
@@ -764,8 +511,8 @@ export class CoinScene {
     this.scene.environment = this.envs.get(name)!;
   }
 
-  private material(f: Finish, p: CoinParams, variant = 0) {
-    const key = variant ? `${f}:${variant}` : f;
+  private material(f: Finish, p: CoinParams) {
+    const key = f;
     let m = this.mats.get(key);
     if (!m) {
       m = new THREE.MeshPhysicalMaterial();
@@ -774,31 +521,6 @@ export class CoinScene {
     const F = FINISHES[f];
     m.color.set(F.color);
     m.metalness = F.metal;
-    if (F.paper) {
-      // paper is a print: show its colours as printed (an unlit layer), with only a little studio light for shape, so the
-      // contrast stays high and graphic instead of washing out like a lit 3D surface
-      const P = paperMaps(F.paper, variant, p.accent);
-      m.map = P.map;
-      m.emissive.set('#ffffff');
-      m.emissiveMap = P.map;
-      m.emissiveIntensity = 0.85;
-      m.toneMapped = false; // the print's exact colours
-      m.roughness = 1;
-      m.roughnessMap = null;
-      m.bumpMap = P.bump;
-      m.bumpScale = F.paper === 'newsprint' ? 2.4 : 1.6; // the crumples, and the wrapped newspaper's folds
-      m.anisotropy = 0;
-      m.anisotropyMap = null;
-      m.clearcoat = 0;
-      m.iridescence = 0;
-      m.envMapIntensity = 0.32;
-      m.vertexColors = true; // the symbol pressed into the paper reads darker
-      m.needsUpdate = true;
-      return m;
-    }
-    m.emissive.set('#000000');
-    m.emissiveMap = null;
-    m.toneMapped = true;
     if (F.stone) {
       // stone: its own texture, matte, a little relief; no clear coat or iridescence (marble keeps a soft polish)
       const S = stoneMaps(F.stone);
@@ -806,7 +528,7 @@ export class CoinScene {
       m.roughness = THREE.MathUtils.clamp(F.rough + p.roughness, 0.05, 1) * 1.6;
       m.roughnessMap = S.rough;
       m.bumpMap = S.bump;
-      m.bumpScale = F.stone === 'concrete' ? 2.2 : 1.2;
+      m.bumpScale = F.stone === 'concrete' ? 3 : 1.2; // concrete: deep pits and seams
       m.anisotropy = 0;
       m.anisotropyMap = null;
       m.clearcoat = F.stone === 'marble' ? 0.35 : 0;
@@ -848,9 +570,9 @@ export class CoinScene {
       this.maps = surfaceMaps(p.brushed, p.scratches);
       this.mapsKey = key;
     }
-    const known = p.finishes.map((f) => (FINISHES[f] ? f : (['halftone', 'graph'].includes(String(f)) ? 'crumpled' : 'silver'))) as Finish[]; // old saves: Halftone and Graph are now Crumpled
+    const known = p.finishes.map((f) => (FINISHES[f] ? f : 'concrete')) as Finish[]; // old saves: the papers are gone; they become concrete
     const finishes = known.length ? known : (['silver'] as Finish[]);
-    finishes.forEach((f) => { this.material(f, p); for (let v = 1; v < pagesOf(FINISHES[f].paper); v++) this.material(f, p, v); });
+    finishes.forEach((f) => this.material(f, p));
     if (p.hdri !== prev.hdri || !this.scene.environment) await this.env(p.hdri);
     this.scene.environmentRotation.set(0, THREE.MathUtils.degToRad(p.envTurn), 0);
     this.renderer.toneMappingExposure = p.exposure;
@@ -861,24 +583,12 @@ export class CoinScene {
     if (layout !== (this as any)._layout || !this.coins.length) {
       (this as any)._layout = layout;
       this.coins.forEach((c) => this.ring.remove(c));
-      this.shadows.forEach((sh) => sh && this.ring.remove(sh));
-      this.shadows = [];
       const cur = p.currencies.length ? p.currencies : (['USD'] as Currency[]);
       this.coins = Array.from({ length: p.count }, (_, i) => {
         const code = cur[i % cur.length];
-        const mesh = new THREE.Mesh((p.relief === 'raised' && this.geos.get(code + '_raised')) || this.geos.get(code)!, this.mats.get(((f) => { const n = pagesOf(FINISHES[f].paper); return n > 1 && i % n ? `${f}:${i % n}` : f; })(finishes[i % finishes.length]))!); // newspaper and scrapbook: each coin its own page
+        const mesh = new THREE.Mesh((p.relief === 'raised' && this.geos.get(code + '_raised')) || this.geos.get(code)!, this.mats.get(finishes[i % finishes.length])!);
         mesh.frustumCulled = false; // ~30 coins: cheaper to draw than to risk a wrong cull
         this.ring.add(mesh);
-        // paper: a cut-out lying on the page casts a crisp offset shadow; a flat dark copy just behind it
-        const paper = !!FINISHES[finishes[i % finishes.length]].paper;
-        mesh.userData.paper = paper;
-        if (paper) {
-          const sh = new THREE.Mesh(mesh.geometry, this.shadowMat);
-          sh.frustumCulled = false;
-          sh.renderOrder = -1;
-          this.ring.add(sh);
-          this.shadows[i] = sh;
-        }
         return mesh;
       });
     }
@@ -915,12 +625,6 @@ export class CoinScene {
     const lean = THREE.MathUtils.degToRad(p.lean);
     const q = new THREE.Quaternion(), qs = new THREE.Quaternion(), qw = new THREE.Quaternion();
     const basis = new THREE.Matrix4();
-    // the camera's right, up and towards-camera directions, in the ring's own frame (for the paper shadows)
-    const toRing = this.ring.quaternion.clone().invert();
-    this.camera.updateMatrixWorld();
-    const camRight = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0).applyQuaternion(toRing);
-    const camUp = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1).applyQuaternion(toRing);
-    const camBack = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 2).applyQuaternion(toRing);
     for (let i = 0; i < n; i++) {
       const c = this.coins[i];
       // where along the path (0..1), moving with the loop. DNA pairs coins across its two strands.
@@ -947,21 +651,8 @@ export class CoinScene {
       const w = Math.sin(u * Math.PI * 2 * 3 + i * 1.7) * p.wobble * 0.35;
       qw.setFromAxisAngle(new THREE.Vector3(1, 0, 0), w);
       c.quaternion.copy(q).multiply(qw).multiply(qs);
-      if (c.userData.paper) {
-        c.scale.set(p.size, p.size * 0.32, p.size); // thin, like card
-        const sh = this.shadows[i];
-        if (sh) {
-          sh.visible = c.visible;
-          sh.quaternion.copy(c.quaternion);
-          sh.scale.copy(c.scale);
-          sh.position.copy(c.position)
-            .addScaledVector(camRight, 0.16 * p.size)
-            .addScaledVector(camUp, -0.22 * p.size)
-            .addScaledVector(camBack, -0.45 * p.size); // down-right, and just behind
-        }
-      }
     }
-    this.shadows.forEach((sh, i) => sh && i >= n && (sh.visible = false));
+
     this.ring.rotation.set(THREE.MathUtils.degToRad(-p.tilt), 0, 0);
     this.ring.position.set(p.offsetX, p.offsetY, p.offsetZ ?? 0);
     const dist = 26 / p.zoom;

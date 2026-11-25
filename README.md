@@ -28,7 +28,7 @@ The loop on its own: tune it, then press **Record one loop** to save an MP4 that
 - **Move the coins:** drag them on the stage.
 - **Zoom:** scroll or pinch, or use **− 100% +** on the stage bar. Hold **Option (⌥)** while scrolling to bring the coins nearer or push them back.
 - **Path:** pick a shape (Ring, Market, Orbit, Cradle, Wave, Helix, DNA or Infinity), then **Suggest framing** if you want it set up for you. Market rises like a stock chart; Orbit is a flat ring seen from a low angle; Cradle is a U that frames whatever sits above it. **Twist** rolls each coin along the path like a ribbon; **Turns** and **Length** set how tightly a helix, DNA or wave coils.
-- **Finish:** click a finish to make every coin that, or ⌘/Shift-click to mix several. There are six metals, four stones (granite, black granite, marble, concrete) and five papers (crumpled, newsprint, kraft, riso, scrapbook). **Symbol** sets whether the currency sign is engraved into the coin or raised from it.
+- **Finish:** click a finish to make every coin that, or ⌘/Shift-click to mix several. There are six metals and four stones (granite, black granite, marble and board-formed concrete). **Symbol** sets whether the currency sign is engraved into the coin or raised from it.
 - **Motion:** **Speed** slows or quickens the loop live. **Loop length** is one full cycle, and so the length of a recording.
 
 ### Landing page
@@ -78,8 +78,7 @@ Try changing `R`, `T`, `REEDS`, `ENGRAVE` or `GLYPH_H` at the top of the script,
 | `src/controls.tsx` | The panel's rows: sliders, colours, toggles |
 
 - **The loop.** Each coin sits at a point along a path (0 to 1) that moves forward with time. Ring and infinity are closed curves. Helix, DNA and wave run off the edges of the frame and wrap round where you can't see. Twist and spins use whole turns, so the last frame flows into the first and every loop is seamless.
-- **The paper.** Each paper is made in code with the canvas 2D API: a crumple (tilted facets crossed by creases) for the relief and shading, halftone dots whose size follows a tone, and fibres and grain. Newspaper comes in seven different pages and Scrapbook in five arrangements (torn openings to gingham dyed in the page theme's colour, washi tape, doodle stars), so no two neighbours match. Paper coins are cut-outs: thin card with a white scissor-cut border, shown in their printed colours for high contrast, each casting a crisp drop shadow. Look at `paperMaps` in `src/scene.ts`.
-- **The stone.** Granite, marble and concrete are drawn in code: a colour map, a roughness map and a relief map, made from layered noise. The coin faces get the texture flat, like a stamp, and the rim gets it wrapped round like a label.
+- **The stone.** Granite, marble and concrete are drawn in code (concrete with formwork boards, seams and air-bubble pits): a colour map, a roughness map and a relief map, made from layered noise. The coin faces get the texture flat, like a stamp, and the rim gets it wrapped round like a label.
 - **The metal.** A `MeshPhysicalMaterial` with metalness 1, plus a roughness map drawn in code (fine circular brushing and hundreds of hairline scratches) and a clear coat.
 - **The light.** This is what makes silver look like silver. A polished metal has no colour of its own; it shows what it reflects. "Product strips" paints a studio into an HDR image: tall soft boxes and a curved backdrop band on black. The coins mirror black with sharp white streaks, like product photography. Switch to the photo studios in **Light** to compare.
 
@@ -88,7 +87,7 @@ Try changing `R`, `T`, `REEDS`, `ENGRAVE` or `GLYPH_H` at the top of the script,
 - Make a coin for your own currency or logo: add it to `COINS` in `blender/coins.py`, then run `npm run coins`.
 - Give each currency its own finish (gold for ₿, for example).
 - Add a path shape of your own to `pathAt` in `src/scene.ts`: a spiral, a heart, a staircase.
-- Add a stone to `stoneMaps` (sandstone, terrazzo, slate) or a paper to `paperMaps` (blueprint, a magazine page, a receipt).
+- Add a stone to `stoneMaps`: sandstone, terrazzo, slate.
 - Turn the **Speed** slider down and **Spins per loop** up, and record a slow, spinning loop.
 - Make the landing page your own: new copy, colours and typefaces.
 
