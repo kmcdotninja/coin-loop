@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Accordion, ColorRow, FoldAll, Group, SelectRow, SliderRow, TextRow, ToggleRow } from './controls';
 import { downloadBlob, dragFrom, stamp, store } from './lib';
 import { CoinScene, coinsShown, CURRENCIES, DEFAULTS, FINISHES, type CoinParams, type Currency, type Finish } from './scene';
-import { FONTS, LANDING, Landing, THEMES, themed, type LandingParams, type PageColors } from './landing';
+import { FONTS, LANDING, LAYOUTS, Landing, THEMES, themed, type Layout, type LandingParams, type PageColors } from './landing';
 
 /**
  * Coin Loop: coins modelled in Blender (blender/coins.py), minted in silver and looped live with three.js.
@@ -44,6 +44,39 @@ const SHAPE_LANDING: Record<CoinParams['shape'], Partial<CoinParams>> = {
   cradle: { shape: 'cradle', size: 1.15, radius: 10, length: 26, tilt: 0, dutch: 0, offsetX: 0, offsetZ: 0, zoom: 0.89, lean: 30, count: 30, twist: 0 },
   infinity: { shape: 'infinity', size: 1, radius: 7.5, tilt: 35, dutch: 0, offsetX: 0, offsetZ: 0, zoom: 0.89, lean: 30, count: 30, twist: 0 },
 };
+
+/** How a shape's suggested framing changes for a layout: in Split long shapes stand upright and the orbit tips up to
+ *  read as a ring beside the text; in Card the ring and orbit shrink to circle the card like a halo. */
+const LAYOUT_SHAPE: Partial<Record<Layout, Partial<Record<CoinParams['shape'], Partial<CoinParams>>>>> = {
+  split: {
+    helix: { dutch: 90 },
+    dna: { dutch: 90 },
+    wave: { dutch: 90 },
+    orbit: { radius: 6, tilt: 62, count: 22, size: 1.15 },
+    ring: { radius: 7, tilt: 10, count: 20, size: 1.2, lean: 35 },
+    infinity: { radius: 6, tilt: 20, dutch: 90 },
+  },
+  card: {
+    ring: { radius: 6, tilt: 0, lean: 15, count: 20, size: 1.05 },
+    orbit: { radius: 7, tilt: 25, count: 26, size: 1.1 },
+    infinity: { radius: 9, tilt: 15, count: 30, size: 1 },
+  },
+};
+
+/** Small drawings of each layout: where the text sits (lines) and where the coins go (dots). */
+function LayoutIcon({ layout }: { layout: Layout }) {
+  const parts = {
+    centered: <><path d="M7 6h10M8.5 9h7M10 12h4" /><circle cx="6" cy="18" r="1.6" /><circle cx="10" cy="19" r="1.6" /><circle cx="14" cy="19" r="1.6" /><circle cx="18" cy="18" r="1.6" /></>,
+    split: <><path d="M3 8h8M3 11h7M3 14h5" /><circle cx="17" cy="7" r="1.6" /><circle cx="19" cy="12" r="1.6" /><circle cx="17" cy="17" r="1.6" /></>,
+    editorial: <><path d="M3 15h10M3 18h8M3 21h5" /><circle cx="8" cy="6" r="1.6" /><circle cx="13" cy="5" r="1.6" /><circle cx="18" cy="7" r="1.6" /><circle cx="20" cy="12" r="1.6" /></>,
+    card: <><circle cx="4" cy="6" r="1.6" /><circle cx="20" cy="18" r="1.6" /><circle cx="19" cy="5" r="1.6" /><circle cx="5" cy="18" r="1.6" /><rect x="6" y="8" width="12" height="8" rx="2" /><path d="M9 11h6M10 13.5h4" /></>,
+  }[layout];
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden>
+      {parts}
+    </svg>
+  );
+}
 
 /** Small drawings of each path shape for the picker. */
 function ShapeIcon({ shape }: { shape: CoinParams['shape'] }) {
@@ -160,15 +193,20 @@ export default function App() {
     };
   }, [mode]);
 
-  /** Landing page: keep the coins clear of the hero. The highest coin sits just under the button and the rest runs off
-   *  the bottom; the zoom is left as it is, so the coins keep their size. */
-  const fitBelowText = (next: CoinParams = p) => {
-    const s = scene.current, cta = document.querySelector('.lp-hero > .lp-btn'), stage = landingHost.current;
-    if (!s || !cta || !stage) return e(next);
-    const st = stage.getBoundingClientRect();
-    const top = cta.getBoundingClientRect().bottom - st.top + 28;
-    const bottom = st.height - 70; // leave the stage bar its room
-    e({ ...next, ...s.fitLanding(next, top, bottom, next.shape === 'cradle' ? 'middle' : 'top') }); // move only: the zoom (89% by default) is never changed
+  /** Landing page: move (never shrink) the coins into the free space the layout leaves, measured from where the text
+   *  actually is: below the button (centred), the right half (split), above the headline (editorial), behind the card. */
+  const fitBelowText = (next: CoinParams = p, layout: Layout = page.layout ?? 'centered') => {
+    const s = scene.current, stage = landingHost.current;
+    const hero = document.querySelector('.lp-hero'), cta = document.querySelector('.lp-hero > .lp-btn'), head = document.querySelector('.lp-head');
+    if (!s || !stage || !hero || !cta) return e(next);
+    const st = stage.getBoundingClientRect(), hr = hero.getBoundingClientRect();
+    const headBottom = (head?.getBoundingClientRect().bottom ?? st.top) - st.top;
+    const margin = 28;
+    if (layout === 'split') return e({ ...next, ...s.fitRegion(next, 'right', hr.right - st.left + 48, (headBottom + st.height) / 2) });
+    if (layout === 'editorial') return e({ ...next, ...s.fitRegion(next, 'between', 0, (headBottom + hr.top - st.top) / 2) }); // in the gap between header and headline
+    if (layout === 'card') return e({ ...next, ...s.fitRegion(next, 'center', st.width / 2, (headBottom + st.height) / 2) });
+    const top = cta.getBoundingClientRect().bottom - st.top + margin;
+    e({ ...next, ...s.fitLanding(next, top, st.height - 70, next.shape === 'cradle' ? 'middle' : 'top') }); // centred: under the button
   };
   const host = () => (mode === 'studio' ? studioHost.current : landingHost.current);
 
@@ -355,7 +393,21 @@ export default function App() {
                   <SliderRow label="Headline weight" value={page.weight} min={400} max={800} step={100} onChange={(v) => ep({ weight: v })} />
                   <SliderRow label="Subtitle size" value={page.subSize} min={10} max={60} step={1} onChange={(v) => ep({ subSize: v })} format={(v) => `${v}px`} />
                 </Group>
-                <Group title="Layout" open={false}>
+                <Group title="Layout">
+                  <div className="cl-layouts" role="radiogroup" aria-label="Page layout">
+                    {(Object.keys(LAYOUTS) as Layout[]).map((id) => (
+                      <button key={id} role="radio" aria-checked={(page.layout ?? 'centered') === id} className={(page.layout ?? 'centered') === id ? 'on' : ''}
+                        onClick={() => {
+                          // the text moves to the layout's place and sizes; the coins then slide into the space it leaves
+                          ep({ layout: id, ...LAYOUTS[id].start });
+                          setTimeout(() => fitBelowText(live.current.p, id), 80);
+                        }}>
+                        <LayoutIcon layout={id} />
+                        {LAYOUTS[id].name}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="rl-note">Suits: {LAYOUTS[page.layout ?? 'centered'].suits}.</p>
                   <SliderRow label="Headline width" value={page.headlineWidth} min={80} max={1440} step={10} onChange={(v) => ep({ headlineWidth: v })} format={(v) => `${v}px`} />
                   <SliderRow label="Subtitle width" value={page.subWidth} min={80} max={1440} step={10} onChange={(v) => ep({ subWidth: v })} format={(v) => `${v}px`} />
                   <SliderRow label="Hero from top" value={page.heroTop} min={0} max={600} step={2} onChange={(v) => ep({ heroTop: v })} format={(v) => `${v}px`} />
@@ -441,7 +493,7 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              <button className="btn-panel" onClick={() => (mode === 'landing' ? fitBelowText({ ...p, ...SHAPE_LANDING[p.shape] }) : e(SHAPE_START[p.shape]))}>
+              <button className="btn-panel" onClick={() => (mode === 'landing' ? fitBelowText({ ...p, ...SHAPE_LANDING[p.shape], ...LAYOUT_SHAPE[page.layout ?? 'centered']?.[p.shape] }) : e(SHAPE_START[p.shape]))}>
                 Suggest framing for this shape
               </button>
               {['helix', 'dna', 'wave', 'market', 'cradle'].includes(p.shape) && (

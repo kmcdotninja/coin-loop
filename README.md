@@ -38,6 +38,7 @@ The loop as the hero of a page, edited the way you'd edit a design in Figma or F
 - **Click** any text to select it, and **double-click** (or press Enter) to type. **Escape** or a click outside finishes.
 - **Drag the side handles** of the headline or subtitle to make its lines longer or shorter.
 - **Drag the empty page** to move the coins. **Pinch** to zoom, and hold **Option (⌥)** while scrolling to bring them nearer or further (a plain scroll leaves them alone). **Position** has exact X, Y, nearer/further, zoom and coin size, and **Keep clear of text** tucks them under the button.
+- **Layout:** Centred (the coins under the button), Split (text left, coins right), Editorial (a big headline bottom-left, coins above it) or Card (the text on a panel, coins all around it). Switching moves the text and slides the coins into the space it leaves, without resizing them; each layout lists the paths that suit it, and **Suggest framing** sets a shape up for the layout you're in.
 - **Theme:** pick a theme, or let **Auto contrast** derive every colour from the background, with button text always readable. You can also set each colour yourself: background, headline, subtitle, navigation, and the primary and secondary buttons.
 - **Type and Layout:** typefaces, sizes, button shape and spacing.
 

@@ -19,7 +19,18 @@ export interface PageColors {
   secondaryText: string;
 }
 
+export type Layout = 'centered' | 'split' | 'editorial' | 'card';
+
+/** What each layout is, the paths that suit it, and the hero sizes it starts from when you switch to it. */
+export const LAYOUTS: Record<Layout, { name: string; suits: string; start: Partial<LandingParams> }> = {
+  centered: { name: 'Centred', suits: 'Ring, Market, Cradle, Wave', start: { headlineWidth: 960, subWidth: 660, headlineSize: 128, heroTop: 58 } },
+  split: { name: 'Split', suits: 'Orbit, Helix, Infinity, Wave (stood upright)', start: { headlineWidth: 620, subWidth: 520, headlineSize: 112, heroTop: 150 } },
+  editorial: { name: 'Editorial', suits: 'Market, Ring, Wave across the top', start: { headlineWidth: 980, subWidth: 560, headlineSize: 150, heroTop: 0 } },
+  card: { name: 'Card', suits: 'any shape: the card keeps the text readable', start: { headlineWidth: 860, subWidth: 620, headlineSize: 112, heroTop: 110 } },
+};
+
 export interface LandingParams {
+  layout: Layout;
   colors: PageColors;
   auto: boolean; // derive buttons, nav and subtitle from the background and ink, with readable button text
   font: string; // headline and logo
@@ -79,6 +90,7 @@ export const THEMES: { name: string; colors: PageColors }[] = [
 ];
 
 export const LANDING: LandingParams = {
+  layout: 'centered',
   colors: THEMES[0].colors,
   auto: true,
   font: 'Momo Trust Display',
@@ -151,7 +163,7 @@ function caretAt(el: HTMLElement, x?: number, y?: number) {
 
 /** A text box with Figma-style side handles: drag either side to change its width (the text re-wraps into longer or
  *  shorter lines). It's centred, so both sides move together. Double-click a handle to reset. */
-function Box({ id, width, onWidth, reset, children }: { id: string; width: number; onWidth: (w: number) => void; reset: number; children: ReactNode }) {
+function Box({ id, width, onWidth, reset, children, anchored = false }: { id: string; width: number; onWidth: (w: number) => void; reset: number; children: ReactNode; anchored?: boolean }) {
   const { selected, select } = useContext(SelCtx);
   const grab = (e: React.PointerEvent<HTMLElement>, side: 1 | -1) => {
     e.preventDefault();
@@ -162,7 +174,7 @@ function Box({ id, width, onWidth, reset, children }: { id: string; width: numbe
     const x0 = e.clientX, w0 = width;
     handle.setPointerCapture(e.pointerId);
     box.classList.add('sizing');
-    const move = (m: PointerEvent) => onWidth(Math.round(Math.max(120, Math.min(1400, w0 + side * 2 * (m.clientX - x0) * k))));
+    const move = (m: PointerEvent) => onWidth(Math.round(Math.max(80, Math.min(1440, w0 + side * (anchored ? 1 : 2) * (m.clientX - x0) * k)))); // centred text grows both ways; left-aligned text from its anchored edge
     const up = () => {
       box.classList.remove('sizing');
       handle.removeEventListener('pointermove', move);
@@ -261,6 +273,7 @@ export function Landing({ l, onText, onPage, onDrag, children }: {
 }) {
   const t = l.text;
   const c = themed(l);
+  const anchored = l.layout === 'split' || l.layout === 'editorial'; // left-aligned text
   const px = (v: number) => `calc(${v} / 1440 * 100cqw)`; // sizes are set for a 1440-wide page and scale with it
   const [selected, select] = useState<string | null>(null);
   const [editing, edit] = useState<string | null>(null);
@@ -284,14 +297,14 @@ export function Landing({ l, onText, onPage, onDrag, children }: {
   return (
     <SelCtx.Provider value={sel}>
       <div
-        className="lp"
+        className={`lp layout-${l.layout ?? 'centered'}`}
         onPointerDown={(e) => {
           // the empty page: deselect, and drag the coins
           if (editing) (document.activeElement as HTMLElement | null)?.blur();
           select(null);
           dragFrom(e, onDrag);
         }}
-        style={{ background: c.bg, color: c.ink, ['--lp-radius' as string]: l.radius >= 999 ? '999px' : px(l.radius), ['--lp-btn-h' as string]: px(l.buttonHeight), ['--lp-sub' as string]: px(l.subSize), ['--lp-top' as string]: px(l.heroTop), fontFamily: `'${l.body}', system-ui, sans-serif`, ['--lp-display' as string]: `'${l.font}', system-ui, sans-serif`, ['--lp-h' as string]: l.headlineSize, ['--lp-w' as string]: l.weight } as CSSProperties}
+        style={{ background: c.bg, color: c.ink, ['--lp-bg' as string]: c.bg, ['--lp-radius' as string]: l.radius >= 999 ? '999px' : px(l.radius), ['--lp-btn-h' as string]: px(l.buttonHeight), ['--lp-sub' as string]: px(l.subSize), ['--lp-top' as string]: px(l.heroTop), fontFamily: `'${l.body}', system-ui, sans-serif`, ['--lp-display' as string]: `'${l.font}', system-ui, sans-serif`, ['--lp-h' as string]: l.headlineSize, ['--lp-w' as string]: l.weight } as CSSProperties}
       >
         <div className="lp-coins">{children}</div>
         <header className="lp-head">
@@ -321,10 +334,10 @@ export function Landing({ l, onText, onPage, onDrag, children }: {
           </span>
         </header>
         <section className="lp-hero">
-          <Box id="headline" width={l.headlineWidth} reset={LANDING.headlineWidth} onWidth={(w) => onPage({ headlineWidth: w })}>
+          <Box id="headline" anchored={anchored} width={l.headlineWidth} reset={LAYOUTS[l.layout ?? 'centered'].start.headlineWidth!} onWidth={(w) => onPage({ headlineWidth: w })}>
             <Edit id="headline" as="h1" multiline value={t.headline} onChange={(v) => onText({ headline: v })} />
           </Box>
-          <Box id="sub" width={l.subWidth} reset={LANDING.subWidth} onWidth={(w) => onPage({ subWidth: w })}>
+          <Box id="sub" anchored={anchored} width={l.subWidth} reset={LAYOUTS[l.layout ?? 'centered'].start.subWidth!} onWidth={(w) => onPage({ subWidth: w })}>
             <Edit id="sub" as="p" multiline value={t.sub} onChange={(v) => onText({ sub: v })} style={{ color: c.sub }} />
           </Box>
           <Edit id="cta" className="lp-btn" value={t.cta} onChange={(v) => onText({ cta: v })} style={{ background: c.primary, color: c.primaryText }} />

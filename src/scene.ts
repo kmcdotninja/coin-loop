@@ -651,6 +651,56 @@ export class CoinScene {
     return { k, right: [Math.cos(d), -Math.sin(d)] as const, up: [Math.sin(d), Math.cos(d)] as const };
   }
 
+  /** The box the coins cover on screen (px from the canvas's top left), counting each coin's size, for a position. */
+  private extents(p: CoinParams, offX: number, offY: number) {
+    const w = this.canvas.clientWidth || 1, h = this.canvas.clientHeight || 1;
+    this.ring.rotation.set(THREE.MathUtils.degToRad(-p.tilt), 0, 0);
+    this.ring.position.set(offX, offY, p.offsetZ ?? 0);
+    this.ring.updateMatrixWorld(true);
+    this.camera.position.set(0, 0, 26 / p.zoom);
+    this.camera.up.set(Math.sin(THREE.MathUtils.degToRad(p.dutch)), Math.cos(THREE.MathUtils.degToRad(p.dutch)), 0);
+    this.camera.lookAt(0, 0, 0);
+    this.camera.updateMatrixWorld(true);
+    const up = this.camera.up.clone().multiplyScalar(p.size * 1.05);
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0).multiplyScalar(p.size * 1.05);
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    const px = (v: THREE.Vector3) => [((v.x + 1) / 2) * w, ((1 - v.y) / 2) * h] as const;
+    for (const phase of p.shape === 'dna' ? [0, Math.PI] : [0])
+      for (let k = 0; k < 240; k++) {
+        const c = this.ring.localToWorld(pathAt(p, k / 240, phase).pos.clone());
+        const ctr = c.clone().project(this.camera);
+        if (ctr.z >= 1) continue;
+        // horizontal reach among coins on screen vertically, vertical reach among coins on screen horizontally
+        if (Math.abs(ctr.y) <= 1.05) {
+          const [l] = px(c.clone().sub(right).project(this.camera)), [r] = px(c.clone().add(right).project(this.camera));
+          minX = Math.min(minX, l, r); maxX = Math.max(maxX, l, r);
+        }
+        if (Math.abs(ctr.x) <= 1.05) {
+          const [, t] = px(c.clone().add(up).project(this.camera)), [, b] = px(c.clone().sub(up).project(this.camera));
+          minY = Math.min(minY, t, b); maxY = Math.max(maxY, t, b);
+        }
+      }
+    const k = (2 * (26 / p.zoom - (p.offsetZ ?? 0)) * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / h;
+    return { minX, maxX, minY, maxY, k };
+  }
+
+  /** Slide the coins (never scale them) into free space on the page:
+   *  'right': their left edge at `x`, centred on `y` (beside left-aligned text).
+   *  'above': their bottom edge at `y` (over text in the bottom corner).
+   *  'center': centred on (x, y) (behind a card). 'between': centred on `y` only (in a gap between header and text).
+   *  Returns the new offsets. */
+  fitRegion(p: CoinParams, anchor: 'right' | 'above' | 'center' | 'between', x: number, y: number) {
+    let offX = p.offsetX, offY = p.offsetY;
+    for (let iter = 0; iter < 10; iter++) {
+      const e = this.extents(p, offX, offY);
+      if (anchor === 'right' && isFinite(e.minX)) offX += (x - e.minX) * e.k;
+      if (anchor === 'center' && isFinite(e.minX)) offX += (x - (e.minX + e.maxX) / 2) * e.k;
+      if (anchor === 'above' && isFinite(e.maxY)) offY += (e.maxY - y) * e.k;
+      if (anchor !== 'above' && isFinite(e.minY)) offY += ((e.minY + e.maxY) / 2 - y) * e.k; // right, center, between
+    }
+    return { offsetX: +offX.toFixed(2), offsetY: +offY.toFixed(2) };
+  }
+
   /** Where the coins reach on screen (px from the canvas top): the top of the highest coin and the bottom of the lowest,
    *  among those horizontally in frame. */
   private reach(p: CoinParams, offY: number, zoom: number, middleOnly = false) {

@@ -442,3 +442,19 @@ html.embed body { background: #ffffff; }
 @keyframes cl-saved { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
 
 .cl-warn { color: #f5c26b; }
+
+/* ---------- landing layouts ---------- */
+/* split: the text on the left, left-aligned; the coins get the right half */
+.lp.layout-split .lp-hero { align-items: flex-start; text-align: left; padding-left: 6cqw; max-width: 50cqw; }
+/* editorial: a big headline in the bottom-left corner; the coins take the space above it */
+.lp.layout-editorial .lp-hero { position: absolute; left: 6cqw; bottom: 8.5cqw; align-items: flex-start; text-align: left; padding-top: 0; }
+/* card: the text on a solid panel in the middle, the coins full-bleed behind it */
+.lp.layout-card .lp-hero { width: fit-content; max-width: 86cqw; margin: var(--lp-top) auto 0; padding: 3.4cqw 4.2cqw 3.6cqw; border-radius: 2.2cqw;
+  background: color-mix(in srgb, var(--lp-bg) 90%, transparent); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 40px 90px -40px rgba(0, 0, 0, 0.45), 0 0 0 1px color-mix(in srgb, currentColor 8%, transparent); }
+
+.cl-layouts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.cl-layouts button { min-width: 0; height: 62px; border: 0; border-radius: var(--r-tile); background: var(--tile); color: var(--panel-muted); font-size: 11px; font-weight: 500;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.cl-layouts button:hover { background: var(--tile-hover); }
+.cl-layouts button.on { background: var(--tile-fill); color: var(--panel-ink); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35); }
