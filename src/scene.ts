@@ -25,7 +25,7 @@ export const FINISHES: Record<Finish, { color: string; rough: number; metal: num
   marble: { color: '#ecebe7', rough: 0.28, metal: 0, irid: 0, stone: 'marble' },
   concrete: { color: '#c2beb6', rough: 0.85, metal: 0, irid: 0, stone: 'concrete' },
   // paper: the colour lives in the printed texture (see paperMaps), so the finish colour is white
-  halftone: { swatch: '#2a1c17', color: '#ffffff', rough: 0.9, metal: 0, irid: 0, paper: 'halftone' },
+  halftone: { swatch: '#1c2b5a', color: '#ffffff', rough: 0.9, metal: 0, irid: 0, paper: 'halftone' },
   newsprint: { swatch: '#d9d4c8', color: '#ffffff', rough: 0.92, metal: 0, irid: 0, paper: 'newsprint' },
   kraft: { swatch: '#b98b5c', color: '#ffffff', rough: 0.95, metal: 0, irid: 0, paper: 'kraft' },
   riso: { swatch: '#ff5fa2', color: '#ffffff', rough: 0.9, metal: 0, irid: 0, paper: 'riso' },
@@ -485,12 +485,12 @@ function paperMaps(kind: Paper) {
     return pts;
   };
   // tear the sheet along a line: below it shows `under` (drawn into the clip), edged with white fibrous paper
-  const tear = (under: (g: CanvasRenderingContext2D) => void, y0: number, y1: number) => {
+  const tear = (under: (g: CanvasRenderingContext2D) => void, y0: number, y1: number, above = false) => {
     const pts = tearLine(y0, y1);
     for (const M of [A, B]) {
       const g = M.g;
       g.save();
-      g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); pts.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(N + 20, N + 20); g.lineTo(-20, N + 20); g.closePath();
+      g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); pts.forEach(([x, y]) => g.lineTo(x, y)); const edge = above ? -20 : N + 20; g.lineTo(N + 20, edge); g.lineTo(-20, edge); g.closePath(); // reveal below the tear, or above it
       g.clip();
       if (M === A) under(g); else { g.fillStyle = '#6a6a6a'; g.fillRect(0, 0, N, N); } // the lower sheet sits a little lower
       g.restore();
@@ -500,7 +500,8 @@ function paperMaps(kind: Paper) {
       for (let pass = 0; pass < 3; pass++) {
         g.lineWidth = 7 - pass * 2 + r() * 3;
         g.globalAlpha = 0.9 - pass * 0.25;
-        g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x + (r() - 0.5) * 3, y + 3 + pass * 2 + (r() - 0.5) * 4) : g.moveTo(x, y + 3))); g.stroke();
+        const dir = above ? -1 : 1; // the white core shows on the torn-away side
+        g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x + (r() - 0.5) * 3, y + dir * (3 + pass * 2) + (r() - 0.5) * 4) : g.moveTo(x, y + dir * 3))); g.stroke();
       }
       g.globalAlpha = 1;
     }
@@ -522,14 +523,35 @@ function paperMaps(kind: Paper) {
 
   if (kind === 'halftone') {
     sheet(A.g, papers.halftone, '#8a7f72');
-    // a deep ink image: a soft diagonal shape in solid and fading halftone
-    halftone(A.g, '#241815', (x, y) => 1.25 - Math.hypot(x - N * 0.38, y - N * 0.35) / (N * 0.55) + (fbm(x / 140, y / 140) - 0.5) * 0.5);
+    // our own print: a navy halftone, densest along the lower edge and fading upward in soft waves
+    halftone(A.g, '#1c2b5a', (x, y) => (y / N) * 1.35 - 0.2 + Math.sin(x / 90) * 0.08 + (fbm(x / 160, y / 160) - 0.5) * 0.45, 12, Math.PI / 6);
+    // torn near the top, from upper left to right, revealing a banknote's security print beneath
     tear((g) => {
-      // underneath: mint paper with broad brown stripes
-      g.fillStyle = '#cdf0c4'; g.fillRect(0, 0, N, N);
-      g.fillStyle = '#3b2216';
-      for (let k = -2; k < 8; k++) { g.save(); g.translate(N / 2, N / 2); g.rotate(-0.35); g.fillRect(-N, k * 170 - N / 2, 2 * N, 85); g.restore(); }
-    }, N * 0.62, N * 0.7);
+      g.fillStyle = '#e8f1ec'; g.fillRect(0, 0, N, N);
+      // guilloché: interwoven fine waves, as on currency
+      g.strokeStyle = '#5f9c8f'; g.lineWidth = 1.1; g.globalAlpha = 0.75;
+      for (let k = 0; k < 44; k++) {
+        g.beginPath();
+        for (let x = 0; x <= N; x += 4) {
+          const y = k * 24 + Math.sin(x / 38 + k * 0.45) * 14 + Math.sin(x / 11 - k) * 3;
+          x ? g.lineTo(x, y) : g.moveTo(x, y);
+        }
+        g.stroke();
+      }
+      g.strokeStyle = '#b07a3c'; g.globalAlpha = 0.45;
+      for (let k = 0; k < 22; k++) {
+        g.beginPath();
+        for (let x = 0; x <= N; x += 4) {
+          const y = k * 48 + 12 + Math.cos(x / 52 - k * 0.6) * 20;
+          x ? g.lineTo(x, y) : g.moveTo(x, y);
+        }
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+      // a line of microtext, as banknotes carry
+      g.fillStyle = '#3f6f65'; g.font = "11px Georgia, 'Times New Roman', serif";
+      for (let y = 40; y < N; y += 210) g.fillText('LEGAL TENDER · ONE · VALUE · TRUST · '.repeat(8), -10, y);
+    }, N * 0.42, N * 0.3, true);
   } else if (kind === 'newsprint') {
     sheet(A.g, papers.newsprint, '#9a968c');
     type(A.g, '#3a3835', 70, 70, N * 0.4, N - 140);
