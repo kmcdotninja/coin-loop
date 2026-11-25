@@ -78,7 +78,7 @@ Try changing `R`, `T`, `REEDS`, `ENGRAVE` or `GLYPH_H` at the top of the script,
 | `src/controls.tsx` | The panel's rows: sliders, colours, toggles |
 
 - **The loop.** Each coin sits at a point along a path (0 to 1) that moves forward with time. Ring and infinity are closed curves. Helix, DNA and wave run off the edges of the frame and wrap round where you can't see. Twist and spins use whole turns, so the last frame flows into the first and every loop is seamless.
-- **The stone.** Granite, marble and concrete are drawn in code (concrete as light cast cement with soft mottling and a few small pores): a colour map, a roughness map and a relief map, made from layered noise. The coin faces get the texture flat, like a stamp, and the rim gets it wrapped round like a label.
+- **The stone.** Granite, marble and concrete are drawn in code (concrete with heavy staining, aggregate and deep air-bubble pits): a colour map, a roughness map and a relief map, made from layered noise. The coin faces get the texture flat, like a stamp, and the rim gets it wrapped round like a label.
 - **The metal.** A `MeshPhysicalMaterial` with metalness 1, plus a roughness map drawn in code (fine circular brushing and hundreds of hairline scratches) and a clear coat.
 - **The light.** This is what makes silver look like silver. A polished metal has no colour of its own; it shows what it reflects. "Product strips" paints a studio into an HDR image: tall soft boxes and a curved backdrop band on black. The coins mirror black with sharp white streaks, like product photography. Switch to the photo studios in **Light** to compare.
 
