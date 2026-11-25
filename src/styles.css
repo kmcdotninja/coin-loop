@@ -440,3 +440,5 @@ html.embed body { background: #ffffff; }
 .cl-saved { margin-left: auto; margin-right: 12px; font-size: 11px; color: var(--panel-muted); opacity: 0; transition: opacity 0.4s ease 0.9s; }
 .cl-saved.on { opacity: 1; animation: cl-saved 1.8s ease forwards; }
 @keyframes cl-saved { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
+
+.cl-warn { color: #f5c26b; }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Accordion, ColorRow, FoldAll, Group, SelectRow, SliderRow, TextRow, ToggleRow } from './controls';
 import { downloadBlob, dragFrom, stamp, store } from './lib';
-import { CoinScene, CURRENCIES, DEFAULTS, FINISHES, type CoinParams, type Currency, type Finish } from './scene';
+import { CoinScene, coinsShown, CURRENCIES, DEFAULTS, FINISHES, type CoinParams, type Currency, type Finish } from './scene';
 import { FONTS, LANDING, Landing, THEMES, themed, type LandingParams, type PageColors } from './landing';
 
 /**
@@ -438,6 +438,12 @@ export default function App() {
                 </>
               )}
               <SliderRow label="Twist" value={p.twist} min={-16} max={16} step={1} onChange={(v) => e({ twist: v })} format={(v) => (v === 0 ? 'None' : `${v > 0 ? '+' : ''}${v} turn${Math.abs(v) > 1 ? 's' : ''}`)} />
+              {coinsShown(p) < p.count && (
+                <p className="rl-note cl-warn">
+                  Showing {coinsShown(p)} of {p.count} coins: turned coins need a coin's width between them, or they'd cut through each other. For more, make the
+                  path longer ({p.shape === 'ring' || p.shape === 'infinity' ? 'Radius' : 'Length'}) or the coins smaller (Size).
+                </p>
+              )}
               <SliderRow label={p.shape === 'ring' || p.shape === 'infinity' ? 'Radius' : 'Width'} value={p.radius} min={0.5} max={40} step={0.1} onChange={(v) => e({ radius: v })} format={(v) => v.toFixed(1)} />
               <SliderRow label="Tilt" value={p.tilt} min={-180} max={180} step={1} onChange={(v) => e({ tilt: v })} format={(v) => `${v}°`} />
               <SliderRow label="Dutch angle" value={p.dutch} min={-180} max={180} step={1} onChange={(v) => e({ dutch: v })} format={(v) => `${v}°`} />

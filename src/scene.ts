@@ -374,6 +374,34 @@ export function pathAt(p: CoinParams, s: number, phase = 0) {
   return { pos, T, F };
 }
 
+/** How many coins fit along the path without any two touching: a coin is 2 × size across (its radius is 1 in the
+ *  model), so centres at least that far apart can never meet, however each coin is turned. Needed when coins turn
+ *  relative to their neighbours (twist, spins): side by side they'd otherwise cut through each other. DNA counts
+ *  per strand. */
+export function roomFor(p: CoinParams) {
+  let len = 0;
+  let prev = pathAt(p, 0).pos;
+  for (let k = 1; k <= 400; k++) {
+    const cur = pathAt(p, k / 400).pos;
+    len += cur.distanceTo(prev);
+    prev = cur;
+  }
+  const perStrand = Math.max(1, Math.floor(len / (2.08 * p.size)));
+  return p.shape === 'dna' ? perStrand * 2 : perStrand;
+}
+
+/** Coins actually shown: all of them, unless they turn against each other (twist or spins) and wouldn't fit. */
+const roomCache = new Map<string, number>();
+export function coinsShown(p: CoinParams) {
+  if (!p.twist && !p.spins) return p.count;
+  const key = [p.shape, p.radius, p.turns, p.length, p.size].join('|');
+  if (!roomCache.has(key)) {
+    if (roomCache.size > 200) roomCache.clear();
+    roomCache.set(key, roomFor(p));
+  }
+  return Math.min(p.count, roomCache.get(key)!);
+}
+
 /* ---------- the scene ---------- */
 
 export class CoinScene {
@@ -547,8 +575,10 @@ export class CoinScene {
   /** Lay the coins round the ring for loop phase u (0..1) and draw. */
   frame(u = this.phase()) {
     const p = this.p;
-    const n = this.coins.length;
-    if (!n || this.disposed || !this.scene.environment) return;
+    if (!this.coins.length || this.disposed || !this.scene.environment) return;
+    // with twist or spins, only as many coins as fit without touching (see roomFor); the rest wait, hidden
+    const n = Math.min(this.coins.length, coinsShown(p));
+    this.coins.forEach((c, i) => (c.visible = i < n));
     const dir = p.reverse ? -1 : 1;
     const lean = THREE.MathUtils.degToRad(p.lean);
     const q = new THREE.Quaternion(), qs = new THREE.Quaternion(), qw = new THREE.Quaternion();
