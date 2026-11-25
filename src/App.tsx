@@ -69,7 +69,8 @@ interface Saved {
   landing?: Partial<CoinParams>;
   page?: Partial<LandingParams>;
   aspect?: Aspect;
-  render?: number; // version of the render defaults the saved settings were made with
+  render?: number;
+  at?: number; // when it was saved: the newer of the browser's copy and the project file wins // version of the render defaults the saved settings were made with
 }
 
 export default function App() {
@@ -91,6 +92,9 @@ export default function App() {
   const [rec, setRec] = useState<null | number>(null);
   const [loading, setLoading] = useState(true);
   const studioHost = useRef<HTMLDivElement>(null);
+  const hydrated = useRef(false);
+  const saveTimer = useRef<number>();
+  const [savedAt, setSavedAt] = useState(0);
   const panelRef = useRef<HTMLElement>(null);
   const landingHost = useRef<HTMLDivElement>(null);
   const scene = useRef<CoinScene>();
@@ -170,10 +174,36 @@ export default function App() {
   useEffect(() => {
     // the landing page's coins render on the page's own colour, so the photographic passes (which need an opaque frame) work there too
     scene.current?.set(mode === 'landing' ? { ...p, background: themed(page).bg } : p);
-    store.set(KEY, { mode, studio: ps.studio, landing: ps.landing, page, aspect, render: 5 });
+    if (!hydrated.current) return; // don't save the defaults over the project file before it has been read
+    const data: Saved = { mode, studio: ps.studio, landing: ps.landing, page, aspect, render: 5, at: Date.now() };
+    store.set(KEY, data);
+    // also to settings.local.json in the project (while developing), shortly after the last change
+    clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => {
+      fetch('/__settings', { method: 'PUT', body: JSON.stringify(data) })
+        .then((r) => r.ok && setSavedAt(Date.now()))
+        .catch(() => {});
+    }, 400);
   }, [p, ps, page, mode, aspect]);
 
   useEffect(() => scene.current?.setPaused(paused), [paused]);
+
+  // on load: if the project file holds newer settings than this browser, use them
+  useEffect(() => {
+    fetch('/__settings', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((f: Saved) => {
+        if (f && f.at && (!saved.at || f.at > saved.at)) {
+          if (f.mode) setMode(f.mode);
+          setPs({ studio: { ...DEFAULTS, ...f.studio }, landing: { ...LANDING_COINS, ...f.landing } });
+          setPage({ ...LANDING, ...f.page, colors: { ...LANDING.colors, ...f.page?.colors }, text: { ...LANDING.text, ...f.page?.text } });
+          if (f.aspect) setAspect(f.aspect);
+        }
+      })
+      .catch(() => {})
+      .finally(() => (hydrated.current = true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // put the canvas in the current mode's stage and fit it (studio: at the chosen aspect; landing: the whole page)
   useEffect(() => {
@@ -266,6 +296,7 @@ export default function App() {
           <Accordion scope={mode}>
           <header className="panel-head">
             <h1>Coin Loop</h1>
+            <span className={`cl-saved ${Date.now() - savedAt < 1800 ? 'on' : ''}`} key={savedAt}>Saved</span>
             <FoldAll key={mode} panel={panelRef} />
           </header>
           <div className="panel-body">
