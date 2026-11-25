@@ -446,14 +446,14 @@ export default function App() {
             </Group>
 
             <Group title="Finish" open={mode === 'studio'}>
-              {([['Metal', false], ['Stone', true]] as const).map(([title, stone]) => (
+              {([['Metal', 'metal'], ['Stone', 'stone'], ['Paper', 'paper']] as const).map(([title, kind]) => (
                 <div key={title} className="cl-finish-set">
                   <span className="cl-sub">{title}</span>
-                  <div className={`cl-chips wide ${stone ? 'two' : ''}`} role="group" aria-label={`${title} finishes, cycled coin by coin`}>
-                    {(Object.keys(FINISHES) as Finish[]).filter((f) => !!FINISHES[f].stone === stone).map((f) => (
+                  <div className={`cl-chips wide ${kind !== 'metal' ? 'two' : ''}`} role="group" aria-label={`${title} finishes, cycled coin by coin`}>
+                    {(Object.keys(FINISHES) as Finish[]).filter((f) => (FINISHES[f].stone ? 'stone' : FINISHES[f].paper ? 'paper' : 'metal') === kind).map((f) => (
                       <button key={f} className={p.finishes.includes(f) ? 'on' : ''} aria-pressed={p.finishes.includes(f)}
                         onClick={(ev) => e({ finishes: ev.metaKey || ev.shiftKey ? (toggle(p.finishes, f).length ? toggle(p.finishes, f) : [f]) : [f] })}>
-                        <i style={{ background: FINISHES[f].color }} />
+                        <i style={{ background: FINISHES[f].swatch ?? FINISHES[f].color }} />
                         {FINISHES[f].label ?? f[0].toUpperCase() + f.slice(1)}
                       </button>
                     ))}
@@ -463,7 +463,7 @@ export default function App() {
               <p className="rl-note">Click a finish to make every coin that. ⌘ or Shift-click to add more to a mix, and the coins take them in turn.</p>
               <SelectRow label="Symbol" value={p.relief} options={[{ value: 'engraved', label: 'Engraved' }, { value: 'raised', label: 'Raised' }]} onChange={(v) => e({ relief: v })} />
               <SliderRow label="Roughness" value={p.roughness} min={-0.5} max={1} onChange={(v) => e({ roughness: v })} format={(v) => (v >= 0 ? '+' : '') + v.toFixed(2)} />
-              {p.finishes.some((f) => !FINISHES[f].stone) && (
+              {p.finishes.some((f) => !FINISHES[f].stone && !FINISHES[f].paper) && (
                 <>
                   <span className="cl-sub">Metal surface</span>
                   <SliderRow label="Brushed" value={p.brushed} min={0} max={1} onChange={(v) => e({ brushed: v })} format={(v) => v.toFixed(2)} />

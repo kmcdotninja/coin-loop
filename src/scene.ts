@@ -10,9 +10,10 @@ import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
  */
 
 export type Stone = 'granite' | 'blackGranite' | 'marble' | 'concrete';
-export type Finish = 'silver' | 'chrome' | 'graphite' | 'gold' | 'coral' | 'violet' | Stone;
+export type Paper = 'halftone' | 'newsprint' | 'kraft' | 'riso';
+export type Finish = 'silver' | 'chrome' | 'graphite' | 'gold' | 'coral' | 'violet' | Stone | Paper;
 /** Metals reflect the studio; stones carry their own texture (drawn in code, see stoneMaps) and are matte. */
-export const FINISHES: Record<Finish, { color: string; rough: number; metal: number; irid: number; stone?: Stone; label?: string }> = {
+export const FINISHES: Record<Finish, { color: string; rough: number; metal: number; irid: number; stone?: Stone; paper?: Paper; label?: string; swatch?: string }> = {
   silver: { color: '#d8dade', rough: 0.15, metal: 1, irid: 0 },
   chrome: { color: '#eceef2', rough: 0.05, metal: 1, irid: 0 },
   graphite: { color: '#5d6066', rough: 0.3, metal: 1, irid: 0 },
@@ -23,6 +24,11 @@ export const FINISHES: Record<Finish, { color: string; rough: number; metal: num
   blackGranite: { color: '#3a3a3d', rough: 0.38, metal: 0, irid: 0, stone: 'blackGranite', label: 'Black granite' },
   marble: { color: '#ecebe7', rough: 0.28, metal: 0, irid: 0, stone: 'marble' },
   concrete: { color: '#c2beb6', rough: 0.85, metal: 0, irid: 0, stone: 'concrete' },
+  // paper: the colour lives in the printed texture (see paperMaps), so the finish colour is white
+  halftone: { swatch: '#2a1c17', color: '#ffffff', rough: 0.9, metal: 0, irid: 0, paper: 'halftone' },
+  newsprint: { swatch: '#d9d4c8', color: '#ffffff', rough: 0.92, metal: 0, irid: 0, paper: 'newsprint' },
+  kraft: { swatch: '#b98b5c', color: '#ffffff', rough: 0.95, metal: 0, irid: 0, paper: 'kraft' },
+  riso: { swatch: '#ff5fa2', color: '#ffffff', rough: 0.9, metal: 0, irid: 0, paper: 'riso' },
 };
 
 /* ---------- stone, drawn in code: an albedo, a roughness and a relief map per stone ---------- */
@@ -422,6 +428,152 @@ export function coinsShown(p: CoinParams) {
   return Math.min(p.count, roomCache.get(key)!);
 }
 
+/* ---------- paper, printed in code: halftone dots, torn edges, type, grain ---------- */
+
+const paperCache = new Map<Paper, { map: THREE.Texture; rough: THREE.Texture; bump: THREE.Texture }>();
+function paperMaps(kind: Paper) {
+  if (paperCache.has(kind)) return paperCache.get(kind)!;
+  const N = 1024;
+  const mk = () => { const c = document.createElement('canvas'); c.width = c.height = N; return { c, g: c.getContext('2d')! }; };
+  const A = mk(), R = mk(), B = mk(); // colour, roughness (ink is a touch smoother), relief (fibres and the tear)
+  const r = rand(kind.length * 97 + 13), n1 = noise2(5), n2 = noise2(71);
+  const fbm = (x: number, y: number) => n1(x, y) * 0.55 + n1(x * 2.1, y * 2.1) * 0.27 + n1(x * 4.3, y * 4.3) * 0.18;
+  const papers: Record<Paper, string> = { halftone: '#efe6da', newsprint: '#ece8de', kraft: '#b98b5c', riso: '#f3eee6' };
+  // the sheet: its colour with soft mottling and fibres
+  const sheet = (g: CanvasRenderingContext2D, base: string, fibre: string, fibres = 900) => {
+    g.fillStyle = base;
+    g.fillRect(0, 0, N, N);
+    const img = g.getImageData(0, 0, N, N);
+    for (let y = 0; y < N; y++)
+      for (let x = 0; x < N; x++) {
+        const i = (y * N + x) * 4, m = (fbm(x / 90, y / 90) - 0.5) * 18 + (r() - 0.5) * 10;
+        img.data[i] += m; img.data[i + 1] += m; img.data[i + 2] += m;
+      }
+    g.putImageData(img, 0, 0);
+    g.strokeStyle = fibre;
+    for (let k = 0; k < fibres; k++) {
+      const x = r() * N, y = r() * N, a = r() * Math.PI * 2, l = 4 + r() * 22;
+      g.globalAlpha = 0.08 + r() * 0.18;
+      g.lineWidth = 0.6 + r() * 0.8;
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a + 0.6) * l * 0.5, y + Math.sin(a + 0.6) * l * 0.5, x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+    }
+    g.globalAlpha = 1;
+  };
+  // halftone: ink dots on a 45° grid, each dot's size following a tone field (0 paper .. 1 solid)
+  const halftone = (g: CanvasRenderingContext2D, ink: string, tone: (x: number, y: number) => number, step = 13, angle = Math.PI / 4, dx = 0, dy = 0) => {
+    g.save();
+    g.fillStyle = ink;
+    const ca = Math.cos(angle), sa = Math.sin(angle);
+    for (let v = -N; v < 2 * N; v += step)
+      for (let u = -N; u < 2 * N; u += step) {
+        const x = u * ca - v * sa + dx, y = u * sa + v * ca + dy;
+        if (x < -step || y < -step || x > N + step || y > N + step) continue;
+        const t = Math.max(0, Math.min(1, tone(x, y)));
+        if (t < 0.03) continue;
+        g.beginPath(); g.arc(x, y, step * 0.72 * Math.sqrt(t), 0, Math.PI * 2); g.fill();
+      }
+    g.restore();
+  };
+  // a torn line: a jagged walk across the sheet, returned as points
+  const tearLine = (y0: number, y1: number) => {
+    const pts: [number, number][] = [];
+    let y = y0;
+    for (let x = -20; x <= N + 20; x += 6) {
+      y += (r() - 0.5) * 16 + (y1 - y0) / ((N + 40) / 6);
+      pts.push([x, y + (n2(x / 40, 3) - 0.5) * 50]);
+    }
+    return pts;
+  };
+  // tear the sheet along a line: below it shows `under` (drawn into the clip), edged with white fibrous paper
+  const tear = (under: (g: CanvasRenderingContext2D) => void, y0: number, y1: number) => {
+    const pts = tearLine(y0, y1);
+    for (const M of [A, B]) {
+      const g = M.g;
+      g.save();
+      g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); pts.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(N + 20, N + 20); g.lineTo(-20, N + 20); g.closePath();
+      g.clip();
+      if (M === A) under(g); else { g.fillStyle = '#6a6a6a'; g.fillRect(0, 0, N, N); } // the lower sheet sits a little lower
+      g.restore();
+      // the torn white edge: the paper's core showing, ragged and fibrous
+      g.strokeStyle = M === A ? '#fbf8f3' : '#b0b0b0';
+      g.lineJoin = 'round';
+      for (let pass = 0; pass < 3; pass++) {
+        g.lineWidth = 7 - pass * 2 + r() * 3;
+        g.globalAlpha = 0.9 - pass * 0.25;
+        g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x + (r() - 0.5) * 3, y + 3 + pass * 2 + (r() - 0.5) * 4) : g.moveTo(x, y + 3))); g.stroke();
+      }
+      g.globalAlpha = 1;
+    }
+  };
+  // printed lines of type in columns
+  const type = (g: CanvasRenderingContext2D, ink: string, x0: number, y0: number, w: number, h: number, size = 17) => {
+    const words = 'invest save grow capital interest yield market fund rate return shares bond growth value account balance compound dividend asset future plan'.split(' ');
+    g.save();
+    g.beginPath(); g.rect(x0, y0, w, h); g.clip();
+    g.fillStyle = ink;
+    g.font = `${size}px Georgia, 'Times New Roman', serif`;
+    for (let y = y0 + size; y < y0 + h; y += size * 1.45) {
+      let x = x0, line = '';
+      while (x < x0 + w) { const wd = words[Math.floor(r() * words.length)]; line += wd + ' '; x += g.measureText(wd + ' ').width; }
+      g.fillText(line, x0, y);
+    }
+    g.restore();
+  };
+
+  if (kind === 'halftone') {
+    sheet(A.g, papers.halftone, '#8a7f72');
+    // a deep ink image: a soft diagonal shape in solid and fading halftone
+    halftone(A.g, '#241815', (x, y) => 1.25 - Math.hypot(x - N * 0.38, y - N * 0.35) / (N * 0.55) + (fbm(x / 140, y / 140) - 0.5) * 0.5);
+    tear((g) => {
+      // underneath: mint paper with broad brown stripes
+      g.fillStyle = '#cdf0c4'; g.fillRect(0, 0, N, N);
+      g.fillStyle = '#3b2216';
+      for (let k = -2; k < 8; k++) { g.save(); g.translate(N / 2, N / 2); g.rotate(-0.35); g.fillRect(-N, k * 170 - N / 2, 2 * N, 85); g.restore(); }
+    }, N * 0.62, N * 0.7);
+  } else if (kind === 'newsprint') {
+    sheet(A.g, papers.newsprint, '#9a968c');
+    type(A.g, '#3a3835', 70, 70, N * 0.4, N - 140);
+    type(A.g, '#3a3835', N * 0.5, N * 0.55, N * 0.42, N * 0.4);
+    // a halftone photo block
+    A.g.save(); A.g.beginPath(); A.g.rect(N * 0.5, 70, N * 0.42, N * 0.44); A.g.clip();
+    A.g.fillStyle = '#dedad0'; A.g.fillRect(N * 0.5, 70, N * 0.42, N * 0.44);
+    halftone(A.g, '#2c2a27', (x, y) => fbm(x / 120, y / 120) * 1.6 - 0.35, 9);
+    A.g.restore();
+  } else if (kind === 'kraft') {
+    sheet(A.g, papers.kraft, '#5c3d22', 2600);
+    halftone(A.g, '#1f140c', (x, y) => (y / N) * 1.3 - 0.25 + (fbm(x / 160, y / 160) - 0.5) * 0.6, 22);
+  } else {
+    sheet(A.g, papers.riso, '#a9a39a');
+    // two inks, each its own halftone angle, slightly out of register
+    A.g.globalCompositeOperation = 'multiply';
+    halftone(A.g, '#ff5fa2', (x, y) => 1.1 - Math.hypot(x - N * 0.35, y - N * 0.4) / (N * 0.5), 12, Math.PI / 12);
+    halftone(A.g, '#3a6cff', (x, y) => 1.05 - Math.hypot(x - N * 0.62, y - N * 0.58) / (N * 0.5), 12, Math.PI / 4, 5, 3);
+    A.g.globalCompositeOperation = 'source-over';
+  }
+  // roughness: paper is matte; ink (darker) a touch smoother
+  const ai = A.g.getImageData(0, 0, N, N), ri = R.g.createImageData(N, N);
+  for (let i = 0; i < ai.data.length; i += 4) {
+    const lum = (ai.data[i] + ai.data[i + 1] + ai.data[i + 2]) / 765;
+    const v = 200 + lum * 50;
+    ri.data[i] = ri.data[i + 1] = ri.data[i + 2] = v; ri.data[i + 3] = 255;
+  }
+  R.g.putImageData(ri, 0, 0);
+  // relief: fibres and grain (the tear was drawn into it above)
+  if (kind !== 'halftone') { B.g.fillStyle = '#808080'; B.g.fillRect(0, 0, N, N); }
+  const bi = B.g.getImageData(0, 0, N, N);
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      const i = (y * N + x) * 4, base = kind === 'halftone' ? bi.data[i] || 128 : 128;
+      const v = base + (fbm(x / 6, y / 6) - 0.5) * 40 + (r() - 0.5) * 14;
+      bi.data[i] = bi.data[i + 1] = bi.data[i + 2] = v; bi.data[i + 3] = 255;
+    }
+  B.g.putImageData(bi, 0, 0);
+  const tex = (c: HTMLCanvasElement, srgb: boolean) => { const t = new THREE.CanvasTexture(c); t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 8; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
+  const out = { map: tex(A.c, true), rough: tex(R.c, false), bump: tex(B.c, false) };
+  paperCache.set(kind, out);
+  return out;
+}
+
 /* ---------- the scene ---------- */
 
 export class CoinScene {
@@ -501,6 +653,23 @@ export class CoinScene {
     const F = FINISHES[f];
     m.color.set(F.color);
     m.metalness = F.metal;
+    if (F.paper) {
+      // paper: the printed texture carries the colour; matte, a little fibre relief, no coat or sheen
+      const P = paperMaps(F.paper);
+      m.map = P.map;
+      m.roughness = THREE.MathUtils.clamp(F.rough + p.roughness, 0.05, 1);
+      m.roughnessMap = P.rough;
+      m.bumpMap = P.bump;
+      m.bumpScale = 0.9;
+      m.anisotropy = 0;
+      m.anisotropyMap = null;
+      m.clearcoat = 0;
+      m.iridescence = 0;
+      m.envMapIntensity = 2.8; // matte paper needs broad light, like stone
+      m.vertexColors = true; // the symbol pressed into the paper reads darker
+      m.needsUpdate = true;
+      return m;
+    }
     if (F.stone) {
       // stone: its own texture, matte, a little relief; no clear coat or iridescence (marble keeps a soft polish)
       const S = stoneMaps(F.stone);
