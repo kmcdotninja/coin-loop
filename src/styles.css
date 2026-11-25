@@ -421,3 +421,18 @@ button.select-row.open { background: var(--tile-hover); }
 
 html.embed { --page: #ffffff; }
 html.embed body { background: #ffffff; }
+
+/* typing an exact value into a slider row */
+.row-type { position: relative; z-index: 2; width: 84px; margin-left: auto; text-align: right; border: 0; border-radius: 6px; padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.1); color: var(--panel-ink); font: inherit; font-variant-numeric: tabular-nums; outline: none; box-shadow: 0 0 0 1.5px #0d99ff; }
+
+/* accordion groups */
+.group-head { margin-bottom: 0; }
+.group.is-open .group-head { margin-bottom: 10px; }
+.group-toggle { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; height: 30px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; text-align: left; }
+.group-toggle h3 { margin: 0; font-size: 13px; font-weight: 500; }
+.group-toggle:hover h3 { color: var(--panel-ink); }
+.group-chevron { color: var(--panel-muted); flex: none; transition: transform 0.18s ease; }
+.group.is-closed .group-chevron { transform: rotate(-90deg); }
+.group { margin-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 6px; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; }

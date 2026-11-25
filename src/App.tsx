@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ColorRow, Group, SelectRow, SliderRow, TextRow, ToggleRow } from './controls';
+import { Accordion, ColorRow, FoldAll, Group, SelectRow, SliderRow, TextRow, ToggleRow } from './controls';
 import { downloadBlob, dragFrom, stamp, store } from './lib';
 import { CoinScene, CURRENCIES, DEFAULTS, FINISHES, type CoinParams, type Currency, type Finish } from './scene';
 import { FONTS, LANDING, Landing, THEMES, themed, type LandingParams, type PageColors } from './landing';
@@ -91,6 +91,7 @@ export default function App() {
   const [rec, setRec] = useState<null | number>(null);
   const [loading, setLoading] = useState(true);
   const studioHost = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
   const landingHost = useRef<HTMLDivElement>(null);
   const scene = useRef<CoinScene>();
   const p = ps[mode];
@@ -115,7 +116,7 @@ export default function App() {
     });
   };
   // scroll or pinch zooms the camera; with Option held it moves the coins nearer or further instead
-  const clampZoom = (z: number) => Math.max(0.4, Math.min(5, +z.toFixed(3)));
+  const clampZoom = (z: number) => Math.max(0.1, Math.min(10, +z.toFixed(3)));
   // Scroll or pinch on the studio stage zooms the camera; with Option held it moves the coins nearer or further.
   // A trackpad pinch arrives as a wheel event with Ctrl held, which the browser would use to zoom the whole page, so
   // the listener is attached directly and non-passive, so it can stop that (React's onWheel can't).
@@ -130,7 +131,7 @@ export default function App() {
       if (mode !== 'studio' && !ev.ctrlKey && !ev.altKey) return;
       ev.preventDefault(); // never zoom or scroll the browser page over the stage
       const { p, e } = live.current;
-      if (ev.altKey) return e({ offsetZ: Math.max(-30, Math.min(16, +((p.offsetZ ?? 0) - ev.deltaY * (ev.ctrlKey ? 0.08 : 0.02)).toFixed(2))) });
+      if (ev.altKey) return e({ offsetZ: Math.max(-80, Math.min(22, +((p.offsetZ ?? 0) - ev.deltaY * (ev.ctrlKey ? 0.08 : 0.02)).toFixed(2))) });
       e({ zoom: clampZoom(p.zoom * Math.exp(-ev.deltaY * (ev.ctrlKey ? 0.01 : 0.0015))) });
     };
     const gesture = (ev: Event) => (ev.target as HTMLElement).closest?.('.cl-stage-card') && ev.preventDefault(); // Safari's pinch
@@ -261,9 +262,11 @@ export default function App() {
           </section>
         </div>
 
-        <aside className="panel" aria-label="Coin Loop settings">
+        <aside className="panel" aria-label="Coin Loop settings" ref={panelRef}>
+          <Accordion scope={mode}>
           <header className="panel-head">
             <h1>Coin Loop</h1>
+            <FoldAll key={mode} panel={panelRef} />
           </header>
           <div className="panel-body">
             <div className="cl-modes" role="tablist" aria-label="View">
@@ -291,7 +294,7 @@ export default function App() {
                   </div>
                   <ToggleRow label="Auto contrast" value={page.auto} onChange={(v) => ep({ auto: v, colors: v ? page.colors : themed(page) })} />
                 </Group>
-                <Group title="Colours">
+                <Group title="Colours" open={false}>
                   <ColorRow label="Background" value={page.colors.bg} onChange={(v) => ec('bg', v)} />
                   <ColorRow label="Headline" value={page.colors.ink} onChange={(v) => ec('ink', v)} />
                   <ColorRow label="Subtitle" value={themed(page).sub} onChange={(v) => ec('sub', v)} />
@@ -302,19 +305,19 @@ export default function App() {
                   <ColorRow label="Secondary text" value={themed(page).secondaryText} onChange={(v) => ec('secondaryText', v)} />
                   <p className="rl-note">With auto contrast on, pick a background and headline colour; buttons, nav and subtitle follow, and button text turns black or white to stay readable. Changing any other colour switches it off.</p>
                 </Group>
-                <Group title="Type">
+                <Group title="Type" open={false}>
                   <SelectRow label="Headline face" value={page.font} options={FONTS.map((f) => ({ value: f, label: f }))} onChange={(v) => ep({ font: v })} />
                   <SelectRow label="Body face" value={page.body} options={FONTS.map((f) => ({ value: f, label: f }))} onChange={(v) => ep({ body: v })} />
-                  <SliderRow label="Headline size" value={page.headlineSize} min={56} max={180} step={1} onChange={(v) => ep({ headlineSize: v })} format={(v) => `${v}px`} />
+                  <SliderRow label="Headline size" value={page.headlineSize} min={24} max={320} step={1} onChange={(v) => ep({ headlineSize: v })} format={(v) => `${v}px`} />
                   <SliderRow label="Headline weight" value={page.weight} min={400} max={800} step={100} onChange={(v) => ep({ weight: v })} />
-                  <SliderRow label="Subtitle size" value={page.subSize} min={13} max={30} step={1} onChange={(v) => ep({ subSize: v })} format={(v) => `${v}px`} />
+                  <SliderRow label="Subtitle size" value={page.subSize} min={10} max={60} step={1} onChange={(v) => ep({ subSize: v })} format={(v) => `${v}px`} />
                 </Group>
-                <Group title="Layout">
-                  <SliderRow label="Headline width" value={page.headlineWidth} min={120} max={1400} step={10} onChange={(v) => ep({ headlineWidth: v })} format={(v) => `${v}px`} />
-                  <SliderRow label="Subtitle width" value={page.subWidth} min={120} max={1400} step={10} onChange={(v) => ep({ subWidth: v })} format={(v) => `${v}px`} />
-                  <SliderRow label="Hero from top" value={page.heroTop} min={0} max={240} step={2} onChange={(v) => ep({ heroTop: v })} format={(v) => `${v}px`} />
+                <Group title="Layout" open={false}>
+                  <SliderRow label="Headline width" value={page.headlineWidth} min={80} max={1440} step={10} onChange={(v) => ep({ headlineWidth: v })} format={(v) => `${v}px`} />
+                  <SliderRow label="Subtitle width" value={page.subWidth} min={80} max={1440} step={10} onChange={(v) => ep({ subWidth: v })} format={(v) => `${v}px`} />
+                  <SliderRow label="Hero from top" value={page.heroTop} min={0} max={600} step={2} onChange={(v) => ep({ heroTop: v })} format={(v) => `${v}px`} />
                   <SliderRow label="Button corners" value={page.radius >= 999 ? 40 : page.radius} min={0} max={40} step={1} onChange={(v) => ep({ radius: v >= 40 ? 999 : v })} format={(v) => (v >= 40 ? 'Pill' : `${v}px`)} />
-                  <SliderRow label="Button height" value={page.buttonHeight} min={36} max={72} step={1} onChange={(v) => ep({ buttonHeight: v })} format={(v) => `${v}px`} />
+                  <SliderRow label="Button height" value={page.buttonHeight} min={24} max={120} step={1} onChange={(v) => ep({ buttonHeight: v })} format={(v) => `${v}px`} />
                   <ToggleRow label="Navigation" value={page.showNav} onChange={(v) => ep({ showNav: v })} />
                   <TextRow label="Nav items" value={page.text.nav} onChange={(v) => et({ nav: v })} />
                   <p className="rl-note">Click any text on the page to edit it. Drag the sides of the headline or subtitle to change their line length.</p>
@@ -324,17 +327,17 @@ export default function App() {
 
             {mode === 'landing' && (
               <Group title="Position" action={<button className="text-btn" onClick={() => e({ offsetX: LANDING_COINS.offsetX, offsetY: LANDING_COINS.offsetY, offsetZ: LANDING_COINS.offsetZ, zoom: LANDING_COINS.zoom, size: LANDING_COINS.size })}>Reset</button>}>
-                <SliderRow label="X  across" value={p.offsetX} min={-20} max={20} step={0.05} onChange={(v) => e({ offsetX: v })} format={(v) => v.toFixed(2)} />
-                <SliderRow label="Y  up" value={p.offsetY} min={-30} max={8} step={0.05} onChange={(v) => e({ offsetY: v })} format={(v) => v.toFixed(2)} />
-                <SliderRow label="Nearer / further" value={p.offsetZ ?? 0} min={-30} max={16} step={0.05} onChange={(v) => e({ offsetZ: v })} format={(v) => (v > 0 ? '+' : '') + v.toFixed(2)} />
-                <SliderRow label="Zoom" value={p.zoom} min={0.4} max={5} step={0.01} onChange={(v) => e({ zoom: v })} format={(v) => `${Math.round(v * 100)}%`} />
-                <SliderRow label="Coin size" value={p.size} min={0.4} max={3} step={0.01} onChange={(v) => e({ size: v })} format={(v) => v.toFixed(2)} />
+                <SliderRow label="X  across" value={p.offsetX} min={-50} max={50} step={0.05} onChange={(v) => e({ offsetX: v })} format={(v) => v.toFixed(2)} />
+                <SliderRow label="Y  up" value={p.offsetY} min={-50} max={50} step={0.05} onChange={(v) => e({ offsetY: v })} format={(v) => v.toFixed(2)} />
+                <SliderRow label="Nearer / further" value={p.offsetZ ?? 0} min={-80} max={22} step={0.05} onChange={(v) => e({ offsetZ: v })} format={(v) => (v > 0 ? '+' : '') + v.toFixed(2)} />
+                <SliderRow label="Zoom" value={p.zoom} min={0.1} max={10} step={0.01} onChange={(v) => e({ zoom: v })} format={(v) => `${Math.round(v * 100)}%`} />
+                <SliderRow label="Coin size" value={p.size} min={0.1} max={6} step={0.01} onChange={(v) => e({ size: v })} format={(v) => v.toFixed(2)} />
                 <button className="btn-panel" onClick={() => fitBelowText()}>Keep clear of text</button>
-                <p className="rl-note">Drag the coins on the page to move them. Pinch to zoom; hold Option (⌥) and scroll to bring them nearer or further. Keep clear of text tucks them under the button without changing their size (picking a shape does this too); after that, everything is yours to change.</p>
+                <p className="rl-note">Drag the coins on the page to move them. Pinch to zoom; hold Option (⌥) and scroll to bring them nearer or further. Keep clear of text tucks them under the button without changing their size. Double-click any value in the panel to type an exact number.</p>
               </Group>
             )}
 
-            <Group title="Coins">
+            <Group title="Coins" open={mode === 'studio'}>
               <div className="cl-chips" role="group" aria-label="Currencies">
                 {CURRENCIES.map((c) => (
                   <button key={c} className={p.currencies.includes(c) ? 'on' : ''} aria-pressed={p.currencies.includes(c)} title={c}
@@ -343,11 +346,11 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              <SliderRow label="Count" value={p.count} min={6} max={80} step={1} onChange={(v) => e({ count: v })} />
-              <SliderRow label="Size" value={p.size} min={0.5} max={2.6} onChange={(v) => e({ size: v })} format={(v) => v.toFixed(2)} />
+              <SliderRow label="Count" value={p.count} min={1} max={200} step={1} onChange={(v) => e({ count: v })} />
+              <SliderRow label="Size" value={p.size} min={0.1} max={6} onChange={(v) => e({ size: v })} format={(v) => v.toFixed(2)} />
             </Group>
 
-            <Group title="Finish">
+            <Group title="Finish" open={mode === 'studio'}>
               {([['Metal', false], ['Stone', true]] as const).map(([title, stone]) => (
                 <div key={title} className="cl-finish-set">
                   <span className="cl-sub">{title}</span>
@@ -363,7 +366,7 @@ export default function App() {
                 </div>
               ))}
               <p className="rl-note">Click a finish to make every coin that. ⌘ or Shift-click to add more to a mix, and the coins take them in turn.</p>
-              <SliderRow label="Roughness" value={p.roughness} min={-0.2} max={0.5} onChange={(v) => e({ roughness: v })} format={(v) => (v >= 0 ? '+' : '') + v.toFixed(2)} />
+              <SliderRow label="Roughness" value={p.roughness} min={-0.5} max={1} onChange={(v) => e({ roughness: v })} format={(v) => (v >= 0 ? '+' : '') + v.toFixed(2)} />
               {p.finishes.some((f) => !FINISHES[f].stone) && (
                 <>
                   <span className="cl-sub">Metal surface</span>
@@ -375,59 +378,58 @@ export default function App() {
               <SliderRow label="Clear coat" value={p.clearcoat} min={0} max={1} onChange={(v) => e({ clearcoat: v })} format={(v) => v.toFixed(2)} />
             </Group>
 
-            <Group title="Motion">
-              <SliderRow label="Speed" value={p.speed} min={0.1} max={2} step={0.05} onChange={(v) => e({ speed: v })} format={(v) => `${v.toFixed(2)}×`} />
-              <SliderRow label="Loop length" value={p.loop} min={3} max={30} step={0.5} onChange={(v) => e({ loop: v })} format={(v) => `${v.toFixed(1)}s`} />
-              <SliderRow label="Lean" value={p.lean} min={0} max={85} step={1} onChange={(v) => e({ lean: v })} format={(v) => `${v}°`} />
-              <SliderRow label="Spins per loop" value={p.spins} min={0} max={4} step={1} onChange={(v) => e({ spins: v })} />
-              <SliderRow label="Wobble" value={p.wobble} min={0} max={1} onChange={(v) => e({ wobble: v })} format={(v) => v.toFixed(2)} />
+            <Group title="Motion" open={false}>
+              <SliderRow label="Speed" value={p.speed} min={0} max={4} step={0.01} onChange={(v) => e({ speed: v })} format={(v) => `${v.toFixed(2)}×`} />
+              <SliderRow label="Loop length" value={p.loop} min={1} max={120} step={0.5} onChange={(v) => e({ loop: v })} format={(v) => `${v.toFixed(1)}s`} />
+              <SliderRow label="Lean" value={p.lean} min={-90} max={90} step={1} onChange={(v) => e({ lean: v })} format={(v) => `${v}°`} />
+              <SliderRow label="Spins per loop" value={p.spins} min={-12} max={12} step={1} onChange={(v) => e({ spins: v })} />
+              <SliderRow label="Wobble" value={p.wobble} min={0} max={3} onChange={(v) => e({ wobble: v })} format={(v) => v.toFixed(2)} />
               <ToggleRow label="Reverse" value={p.reverse} onChange={(v) => e({ reverse: v })} />
             </Group>
 
-            <Group title="Path">
+            <Group title="Path" open={mode === 'studio'}>
               <div className="cl-shapes" role="radiogroup" aria-label="Path shape">
                 {([['ring', 'Ring'], ['helix', 'Helix'], ['dna', 'DNA'], ['wave', 'Wave'], ['infinity', 'Infinity']] as const).map(([id, name]) => (
                   <button key={id} role="radio" aria-checked={(p.shape ?? 'ring') === id} className={(p.shape ?? 'ring') === id ? 'on' : ''}
-                    onClick={() => {
-                      // on the landing page keep where the coins sit; in the studio, frame the new shape too
-                      if (mode === 'landing') fitBelowText({ ...p, ...SHAPE_LANDING[id] });
-                      else e(SHAPE_START[id]);
-                    }}>
+                    onClick={() => e({ shape: id })}>
                     <ShapeIcon shape={id} />
                     {name}
                   </button>
                 ))}
               </div>
+              <button className="btn-panel" onClick={() => (mode === 'landing' ? fitBelowText({ ...p, ...SHAPE_LANDING[p.shape] }) : e(SHAPE_START[p.shape]))}>
+                Suggest framing for this shape
+              </button>
               {['helix', 'dna', 'wave'].includes(p.shape) && (
                 <>
-                  <SliderRow label={p.shape === 'wave' ? 'Waves' : 'Turns'} value={p.turns} min={1} max={8} step={1} onChange={(v) => e({ turns: v })} />
-                  <SliderRow label="Length" value={p.length} min={14} max={80} step={1} onChange={(v) => e({ length: v })} format={(v) => v.toFixed(0)} />
+                  <SliderRow label={p.shape === 'wave' ? 'Waves' : 'Turns'} value={p.turns} min={1} max={24} step={1} onChange={(v) => e({ turns: v })} />
+                  <SliderRow label="Length" value={p.length} min={4} max={200} step={1} onChange={(v) => e({ length: v })} format={(v) => v.toFixed(0)} />
                 </>
               )}
-              <SliderRow label="Twist" value={p.twist} min={-4} max={4} step={1} onChange={(v) => e({ twist: v })} format={(v) => (v === 0 ? 'None' : `${v > 0 ? '+' : ''}${v} turn${Math.abs(v) > 1 ? 's' : ''}`)} />
-              <SliderRow label={p.shape === 'ring' || p.shape === 'infinity' ? 'Radius' : 'Width'} value={p.radius} min={3} max={18} step={0.1} onChange={(v) => e({ radius: v })} format={(v) => v.toFixed(1)} />
-              <SliderRow label="Tilt" value={p.tilt} min={-60} max={60} step={1} onChange={(v) => e({ tilt: v })} format={(v) => `${v}°`} />
-              <SliderRow label="Dutch angle" value={p.dutch} min={-45} max={45} step={1} onChange={(v) => e({ dutch: v })} format={(v) => `${v}°`} />
-              <SliderRow label="Offset X" value={p.offsetX} min={-20} max={20} step={0.05} onChange={(v) => e({ offsetX: v })} format={(v) => v.toFixed(2)} />
-              <SliderRow label="Offset Y" value={p.offsetY} min={-30} max={8} step={0.05} onChange={(v) => e({ offsetY: v })} format={(v) => v.toFixed(2)} />
-              <SliderRow label="Offset Z" value={p.offsetZ ?? 0} min={-30} max={16} step={0.05} onChange={(v) => e({ offsetZ: v })} format={(v) => v.toFixed(2)} />
+              <SliderRow label="Twist" value={p.twist} min={-16} max={16} step={1} onChange={(v) => e({ twist: v })} format={(v) => (v === 0 ? 'None' : `${v > 0 ? '+' : ''}${v} turn${Math.abs(v) > 1 ? 's' : ''}`)} />
+              <SliderRow label={p.shape === 'ring' || p.shape === 'infinity' ? 'Radius' : 'Width'} value={p.radius} min={0.5} max={40} step={0.1} onChange={(v) => e({ radius: v })} format={(v) => v.toFixed(1)} />
+              <SliderRow label="Tilt" value={p.tilt} min={-180} max={180} step={1} onChange={(v) => e({ tilt: v })} format={(v) => `${v}°`} />
+              <SliderRow label="Dutch angle" value={p.dutch} min={-180} max={180} step={1} onChange={(v) => e({ dutch: v })} format={(v) => `${v}°`} />
+              <SliderRow label="Offset X" value={p.offsetX} min={-50} max={50} step={0.05} onChange={(v) => e({ offsetX: v })} format={(v) => v.toFixed(2)} />
+              <SliderRow label="Offset Y" value={p.offsetY} min={-50} max={50} step={0.05} onChange={(v) => e({ offsetY: v })} format={(v) => v.toFixed(2)} />
+              <SliderRow label="Offset Z" value={p.offsetZ ?? 0} min={-80} max={22} step={0.05} onChange={(v) => e({ offsetZ: v })} format={(v) => v.toFixed(2)} />
               {mode === 'studio' && <p className="rl-note">Or drag the coins on the stage. Scroll or pinch to zoom; hold Option (⌥) while scrolling to bring them nearer.</p>}
-              <SliderRow label="Zoom" value={p.zoom} min={0.4} max={5} step={0.01} onChange={(v) => e({ zoom: v })} format={(v) => `${Math.round(v * 100)}%`} />
+              <SliderRow label="Zoom" value={p.zoom} min={0.1} max={10} step={0.01} onChange={(v) => e({ zoom: v })} format={(v) => `${Math.round(v * 100)}%`} />
             </Group>
 
-            <Group title="Light">
+            <Group title="Light" open={false}>
               <SelectRow label="Studio" value={p.hdri} options={[{ value: 'strips', label: 'Product strips' }, { value: 'studio_small_08', label: 'Studio (photo)' }, { value: 'studio_small_03', label: 'Studio 2 (photo)' }]}
                 onChange={(v) => e({ hdri: v })} />
               <SliderRow label="Turn" value={p.envTurn} min={0} max={360} step={1} onChange={(v) => e({ envTurn: v })} format={(v) => `${v}°`} />
-              <SliderRow label="Exposure" value={p.exposure} min={0.4} max={2} onChange={(v) => e({ exposure: v })} format={(v) => v.toFixed(2)} />
+              <SliderRow label="Exposure" value={p.exposure} min={0.1} max={4} onChange={(v) => e({ exposure: v })} format={(v) => v.toFixed(2)} />
             </Group>
 
             {mode === 'studio' && (
               <>
-                <Group title="Background">
+                <Group title="Background" open={false}>
                   <ColorRow label="Colour" value={p.background === 'transparent' ? '#050505' : p.background} onChange={(v) => e({ background: v })} />
                 </Group>
-                <Group title="Export">
+                <Group title="Export" open={false}>
                   <SelectRow label="Frame" value={aspect} options={(Object.keys(ASPECTS) as Aspect[]).map((a) => ({ value: a, label: a }))} onChange={setAspect} />
                   <button className="btn-panel" onClick={record} disabled={rec !== null}>
                     {rec === null ? `Record one loop (${(p.loop / p.speed).toFixed(1)}s)` : `Recording… ${Math.round(rec * 100)}%`}
@@ -446,6 +448,7 @@ export default function App() {
               Reset {mode === 'studio' ? 'the studio' : 'the landing page'}
             </button>
           </div>
+          </Accordion>
         </aside>
       </div>
     </div>

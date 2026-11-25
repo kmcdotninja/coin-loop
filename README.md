@@ -15,13 +15,19 @@ npm install
 npm run dev        # opens http://localhost:4848
 ```
 
+### The panel
+
+- Every group folds: click its title, or use **Collapse all** at the top. The panel remembers what you left open.
+- **Double-click any slider's value** to type an exact number. Typed numbers can go beyond the slider's range.
+- Nothing is decided for you. Picking a shape changes only the shape, and **Suggest framing for this shape** is there when you want a starting point.
+
 ### Studio
 
 The loop on its own: tune it, then press **Record one loop** to save an MP4 that repeats without a visible jump.
 
 - **Move the coins:** drag them on the stage.
 - **Zoom:** scroll or pinch, or use **− 100% +** on the stage bar. Hold **Option (⌥)** while scrolling to bring the coins nearer or push them back.
-- **Path:** pick a shape (Ring, Helix, DNA, Wave or Infinity). **Twist** rolls each coin along the path like a ribbon; **Turns** and **Length** set how tightly a helix, DNA or wave coils.
+- **Path:** pick a shape (Ring, Helix, DNA, Wave or Infinity), then **Suggest framing** if you want it set up for you. **Twist** rolls each coin along the path like a ribbon; **Turns** and **Length** set how tightly a helix, DNA or wave coils.
 - **Finish:** click a finish to make every coin that, or ⌘/Shift-click to mix several. There are six metals and four stones: granite, black granite, marble and concrete.
 - **Motion:** **Speed** slows or quickens the loop live. **Loop length** is one full cycle, and so the length of a recording.
 

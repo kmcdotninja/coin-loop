@@ -1,22 +1,83 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import type React from 'react';
 import { clamp } from './lib';
 import { ChevronUpDown, Plus } from './icons';
 
 /* All controls are designed for the dark settings panel. */
 
-export function Group({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+/* ---------- the accordion: groups fold and unfold, and the panel remembers which are open ---------- */
+
+const OPEN_KEY = 'coin-loop.open.v1';
+type OpenState = Record<string, boolean>;
+const openStore = {
+  get(): OpenState { try { return JSON.parse(localStorage.getItem(OPEN_KEY) || '{}'); } catch { return {}; } },
+  set(v: OpenState) { try { localStorage.setItem(OPEN_KEY, JSON.stringify(v)); } catch { /* ignore */ } },
+};
+const AccordionCtx = createContext<{ scope: string; open: OpenState; toggle: (id: string, def: boolean) => void }>({
+  scope: '', open: {}, toggle: () => {},
+});
+
+/** Wraps the panel: holds which groups are open (per scope, e.g. studio or landing) and lets them fold all at once. */
+export function Accordion({ scope, children }: { scope: string; children: ReactNode }) {
+  const [open, setOpen] = useState<OpenState>(openStore.get);
+  const toggle = (id: string, def: boolean) =>
+    setOpen((o) => {
+      const n = { ...o, [id]: !(o[id] ?? def) };
+      openStore.set(n);
+      return n;
+    });
+  return <AccordionCtx.Provider value={{ scope, open, toggle }}>{children}</AccordionCtx.Provider>;
+}
+
+export function Group({ title, action, children, open: defaultOpen = true }: { title: string; action?: ReactNode; children: ReactNode; open?: boolean }) {
+  const { scope, open, toggle } = useContext(AccordionCtx);
+  const id = `${scope}:${title}`;
+  const isOpen = open[id] ?? defaultOpen;
+  const bodyId = useId();
   return (
-    <section className="group">
+    <section className={`group ${isOpen ? 'is-open' : 'is-closed'}`} data-group={title}>
       <header className="group-head">
-        <h3>{title}</h3>
-        {action}
+        <button type="button" className="group-toggle" aria-expanded={isOpen} aria-controls={bodyId} onClick={() => toggle(id, defaultOpen)}>
+          <svg className="group-chevron" width="12" height="12" viewBox="0 0 12 12" aria-hidden>
+            <path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <h3>{title}</h3>
+        </button>
+        {isOpen && action}
       </header>
-      <div className="group-body">{children}</div>
+      {isOpen && (
+        <div className="group-body" id={bodyId}>
+          {children}
+        </div>
+      )}
     </section>
   );
 }
 
-/** The whole row is the slider: drag anywhere across it. */
+/** Collapse all / expand all, for the panel header: acts on the groups currently in the panel. */
+export function FoldAll({ panel }: { panel: React.RefObject<HTMLElement> }) {
+  const ctx = useContext(AccordionCtx);
+  const [next, setNext] = useState<'collapse' | 'expand'>('collapse');
+  return (
+    <button
+      type="button"
+      className="panel-action"
+      onClick={() => {
+        const v = next === 'expand';
+        panel.current?.querySelectorAll<HTMLElement>('[data-group]').forEach((g) => {
+          const cur = g.classList.contains('is-open');
+          if (cur !== v) ctx.toggle(`${ctx.scope}:${g.dataset.group}`, cur);
+        });
+        setNext(v ? 'collapse' : 'expand');
+      }}
+    >
+      {next === 'collapse' ? 'Collapse all' : 'Expand all'}
+    </button>
+  );
+}
+
+/** The whole row is the slider: drag anywhere across it. Double-click it to type an exact number, which may go beyond
+ *  the slider's range (Enter sets it, Escape cancels). */
 export function SliderRow({
   label,
   value,
@@ -34,21 +95,59 @@ export function SliderRow({
   onChange: (v: number) => void;
   format?: (v: number) => string;
 }) {
+  const [typing, setTyping] = useState(false);
+  // the value before a double-click's first click (which moves the slider): restored when typing opens
+  const before = useRef({ v: value, t: 0 });
   const pct = clamp((value - min) / (max - min)) * 100;
+  const commit = (raw: string) => {
+    const v = parseFloat(raw.replace(/[^0-9.+-]/g, ''));
+    if (Number.isFinite(v)) onChange(raw.trim().endsWith('%') ? v / 100 : v);
+    setTyping(false);
+  };
   return (
-    <label className="row slider-row" style={{ ['--pct' as string]: `${pct}%` }}>
+    <label
+      className="row slider-row"
+      style={{ ['--pct' as string]: `${pct}%` }}
+      onPointerDownCapture={() => {
+        const now = performance.now();
+        if (now - before.current.t > 450) before.current = { v: value, t: now };
+      }}
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        if (before.current.v !== value) onChange(before.current.v);
+        setTyping(true);
+      }}
+    >
       <span className="fill" aria-hidden />
       <span className="row-label">{label}</span>
-      <span className="row-value">{format ? format(value) : value}</span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        aria-label={label}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
+      {typing ? (
+        <input
+          className="row-type"
+          autoFocus
+          defaultValue={String(+before.current.v.toFixed(4))}
+          aria-label={`${label}, exact value`}
+          onFocus={(e) => e.currentTarget.select()}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') commit(e.currentTarget.value);
+            if (e.key === 'Escape') setTyping(false);
+          }}
+          onBlur={(e) => commit(e.currentTarget.value)}
+        />
+      ) : (
+        <span className="row-value">{format ? format(value) : value}</span>
+      )}
+      {!typing && (
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={Math.min(max, Math.max(min, value))}
+          aria-label={label}
+          onChange={(e) => onChange(Number(e.target.value))}
+        />
+      )}
     </label>
   );
 }
