@@ -29,6 +29,16 @@ const SHAPE_START: Record<CoinParams['shape'], Partial<CoinParams>> = {
   infinity: { shape: 'infinity', size: 1.3, radius: 9, tilt: 20, dutch: -6, offsetX: 0, offsetY: 0, offsetZ: 0, zoom: 1.2, lean: 30, count: 28, twist: 0 },
 };
 
+/** On the landing page the hero text owns the top and middle, so every shape runs flat and sideways in the band below
+ *  it (fitBelowText then lowers it until it clears the button). */
+const SHAPE_LANDING: Record<CoinParams['shape'], Partial<CoinParams>> = {
+  ring: { shape: 'ring', size: 1.75, radius: 13, tilt: 14, dutch: -6, offsetX: 0, offsetZ: 0, zoom: 1.25, lean: 40, count: 28, twist: 0 },
+  wave: { shape: 'wave', size: 1.35, radius: 7, turns: 2, length: 64, tilt: 20, dutch: -3, offsetX: 0, offsetZ: 0, zoom: 1.15, lean: 35, count: 34, twist: 1 },
+  helix: { shape: 'helix', size: 1.05, radius: 6, turns: 5, length: 64, tilt: 0, dutch: -3, offsetX: 0, offsetZ: 0, zoom: 1.15, lean: 12, count: 44, twist: 0 },
+  dna: { shape: 'dna', size: 0.8, radius: 6.5, turns: 4, length: 64, tilt: 0, dutch: -3, offsetX: 0, offsetZ: 0, zoom: 1.15, lean: 8, count: 80, twist: 0 },
+  infinity: { shape: 'infinity', size: 1, radius: 7.5, tilt: 35, dutch: 0, offsetX: 0, offsetZ: 0, zoom: 1.25, lean: 30, count: 30, twist: 0 },
+};
+
 /** Small drawings of each path shape for the picker. */
 function ShapeIcon({ shape }: { shape: CoinParams['shape'] }) {
   const d = {
@@ -66,6 +76,8 @@ export default function App() {
   const saved = store.get<Saved>(KEY, {});
   // once: drop settings from the removed photoreal pipeline
   if ((saved.render ?? 0) < 3) for (const k of ['studio', 'landing'] as const) for (const f of ['quality', 'tone', 'bloom', 'grain', 'focus', 'vignette', 'keyLight', 'occlusion', 'shadowSoftness']) delete (saved[k] as Record<string, unknown> | undefined)?.[f];
+  // once: the default speed became 0.1×
+  if ((saved.render ?? 0) < 4) for (const k of ['studio', 'landing'] as const) delete saved[k]?.speed;
   const [mode, setMode] = useState<Mode>(saved.mode ?? 'studio');
   const [ps, setPs] = useState<Record<Mode, CoinParams>>({
     studio: { ...DEFAULTS, ...saved.studio },
@@ -128,6 +140,16 @@ export default function App() {
     };
   }, [mode]);
 
+  /** Landing page: keep the coins clear of the hero. The ring's arc starts just under the button and sweeps off the
+   *  bottom; the other shapes are scaled and centred in the band between the button and the bottom of the page. */
+  const fitBelowText = (next: CoinParams = p) => {
+    const s = scene.current, cta = document.querySelector('.lp-hero > .lp-btn'), stage = landingHost.current;
+    if (!s || !cta || !stage) return e(next);
+    const st = stage.getBoundingClientRect();
+    const top = cta.getBoundingClientRect().bottom - st.top + 28;
+    const bottom = st.height - 70; // leave the stage bar its room
+    e({ ...next, ...s.fitLanding(next, top, bottom, next.shape === 'ring' ? 'top' : 'band') });
+  };
   const host = () => (mode === 'studio' ? studioHost.current : landingHost.current);
 
   useEffect(() => {
@@ -143,7 +165,7 @@ export default function App() {
   useEffect(() => {
     // the landing page's coins render on the page's own colour, so the photographic passes (which need an opaque frame) work there too
     scene.current?.set(mode === 'landing' ? { ...p, background: themed(page).bg } : p);
-    store.set(KEY, { mode, studio: ps.studio, landing: ps.landing, page, aspect, render: 3 });
+    store.set(KEY, { mode, studio: ps.studio, landing: ps.landing, page, aspect, render: 4 });
   }, [p, ps, page, mode, aspect]);
 
   useEffect(() => scene.current?.setPaused(paused), [paused]);
@@ -301,7 +323,8 @@ export default function App() {
                 <SliderRow label="X  across" value={p.offsetX} min={-20} max={20} step={0.05} onChange={(v) => e({ offsetX: v })} format={(v) => v.toFixed(2)} />
                 <SliderRow label="Y  up" value={p.offsetY} min={-30} max={8} step={0.05} onChange={(v) => e({ offsetY: v })} format={(v) => v.toFixed(2)} />
                 <SliderRow label="Z  nearer" value={p.offsetZ ?? 0} min={-30} max={16} step={0.05} onChange={(v) => e({ offsetZ: v })} format={(v) => v.toFixed(2)} />
-                <p className="rl-note">Or drag the coins on the page.</p>
+                <button className="btn-panel" onClick={() => fitBelowText()}>Keep clear of text</button>
+                <p className="rl-note">Or drag the coins on the page. Keep clear of text places them under the button: the ring sweeps off the bottom, other shapes fit the space below. Use it again after changing the text or its size.</p>
               </Group>
             )}
 
@@ -361,8 +384,8 @@ export default function App() {
                   <button key={id} role="radio" aria-checked={(p.shape ?? 'ring') === id} className={(p.shape ?? 'ring') === id ? 'on' : ''}
                     onClick={() => {
                       // on the landing page keep where the coins sit; in the studio, frame the new shape too
-                      const st = SHAPE_START[id];
-                      e(mode === 'landing' ? { shape: st.shape, turns: st.turns, length: st.length, lean: st.lean, count: st.count, twist: st.twist, size: st.size } : st);
+                      if (mode === 'landing') fitBelowText({ ...p, ...SHAPE_LANDING[id] });
+                      else e(SHAPE_START[id]);
                     }}>
                     <ShapeIcon shape={id} />
                     {name}

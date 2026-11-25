@@ -146,7 +146,7 @@ export const DEFAULTS: CoinParams = {
   offsetZ: 0,
   zoom: 1.6,
   loop: 14,
-  speed: 1,
+  speed: 0.1,
   lean: 42,
   spins: 0,
   wobble: 0.1,
@@ -598,6 +598,48 @@ export class CoinScene {
     const k = (2 * depth * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / h;
     const d = THREE.MathUtils.degToRad(p.dutch);
     return { k, right: [Math.cos(d), -Math.sin(d)] as const, up: [Math.sin(d), Math.cos(d)] as const };
+  }
+
+  /** Where the coins reach on screen (px from the canvas top): the top of the highest coin and the bottom of the lowest,
+   *  among those horizontally in frame. */
+  private reach(p: CoinParams, offY: number, zoom: number) {
+    const h = this.canvas.clientHeight || 1;
+    this.ring.rotation.set(THREE.MathUtils.degToRad(-p.tilt), 0, 0);
+    this.ring.position.set(p.offsetX, offY, p.offsetZ ?? 0);
+    this.ring.updateMatrixWorld(true);
+    this.camera.position.set(0, 0, 26 / zoom);
+    this.camera.up.set(Math.sin(THREE.MathUtils.degToRad(p.dutch)), Math.cos(THREE.MathUtils.degToRad(p.dutch)), 0);
+    this.camera.lookAt(0, 0, 0);
+    this.camera.updateMatrixWorld(true);
+    const up = this.camera.up.clone().multiplyScalar(p.size * 1.05);
+    let top = Infinity, bottom = -Infinity;
+    for (const phase of p.shape === 'dna' ? [0, Math.PI] : [0])
+      for (let k = 0; k < 240; k++) {
+        const c = this.ring.localToWorld(pathAt(p, k / 240, phase).pos.clone());
+        const t = c.clone().add(up).project(this.camera), b = c.clone().sub(up).project(this.camera);
+        if (Math.abs(t.x) <= 1.05 && t.z < 1) top = Math.min(top, ((1 - t.y) / 2) * h);
+        if (Math.abs(b.x) <= 1.05 && b.z < 1) bottom = Math.max(bottom, ((1 - b.y) / 2) * h);
+      }
+    return { top, bottom, k: (2 * (26 / zoom - (p.offsetZ ?? 0)) * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / h };
+  }
+
+  /** Landing page placement, so the coins never cross the hero text.
+   *  'top': the highest coin sits at `topPx` and the rest may run off the bottom (the ring's sweeping arc).
+   *  'band': the whole shape is scaled and centred to fit between `topPx` and `bottomPx` (wave, helix, DNA, infinity). */
+  fitLanding(p: CoinParams, topPx: number, bottomPx: number, mode: 'top' | 'band') {
+    let offY = p.offsetY, zoom = p.zoom;
+    for (let iter = 0; iter < 10; iter++) {
+      let r = this.reach(p, offY, zoom);
+      if (!isFinite(r.top)) break;
+      if (mode === 'band' && isFinite(r.bottom)) {
+        // scale so the shape's height fills the band (screen size grows with zoom)
+        const ext = r.bottom - r.top, band = bottomPx - topPx;
+        if (ext > 1) zoom = Math.max(0.4, Math.min(5, zoom * Math.pow(band / ext, 0.9)));
+        r = this.reach(p, offY, zoom);
+        offY += ((r.top + r.bottom) / 2 - (topPx + bottomPx) / 2) * r.k;
+      } else offY += (r.top - topPx) * r.k;
+    }
+    return { offsetY: +offY.toFixed(2), zoom: +zoom.toFixed(3) };
   }
 
   start() {

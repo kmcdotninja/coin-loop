@@ -1,4 +1,4 @@
-import { useId, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { clamp } from './lib';
 import { ChevronUpDown, Plus } from './icons';
 
@@ -53,6 +53,9 @@ export function SliderRow({
   );
 }
 
+/** A dropdown drawn in the page rather than the browser's own menu: the browser's menu opens in the wrong place (or
+ *  not at all) when the tool runs inside a scaled frame, as it does on a deck slide. Click or Enter/Space to open,
+ *  ↑ ↓ to move, Enter to choose, Escape or a click outside to close. */
 export function SelectRow<T extends string>({
   label,
   value,
@@ -64,22 +67,96 @@ export function SelectRow<T extends string>({
   options: { value: T; label: string; disabled?: boolean }[];
   onChange: (v: T) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(0);
+  const [pos, setPos] = useState<{ left: number; width: number; top?: number; bottom?: number }>({ left: 0, width: 0 });
+  const btn = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const listId = useId();
   const current = options.find((o) => o.value === value)?.label ?? value;
+
+  const show = () => {
+    const r = btn.current!.getBoundingClientRect();
+    const below = window.innerHeight - r.bottom, need = Math.min(280, options.length * 34 + 12);
+    setPos(below >= need || below > r.top ? { left: r.left, width: r.width, top: r.bottom + 4 } : { left: r.left, width: r.width, bottom: window.innerHeight - r.top + 4 });
+    setHi(Math.max(0, options.findIndex((o) => o.value === value)));
+    setOpen(true);
+  };
+  const choose = (i: number) => {
+    const o = options[i];
+    if (!o || o.disabled) return;
+    onChange(o.value);
+    setOpen(false);
+    btn.current?.focus();
+  };
+
+  // close on a click anywhere else, or when the panel scrolls or the window resizes
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: Event) => {
+      if (!menu.current?.contains(e.target as Node) && !btn.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const close = () => setOpen(false);
+    document.addEventListener('pointerdown', away, true);
+    window.addEventListener('resize', close);
+    document.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('pointerdown', away, true);
+      window.removeEventListener('resize', close);
+      document.removeEventListener('scroll', close, true);
+    };
+  }, [open]);
+
+  const onKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (!open) {
+      if (['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(e.key)) (e.preventDefault(), show());
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation(); // not the deck's slide keys
+    if (e.key === 'ArrowDown') setHi((h) => Math.min(options.length - 1, h + 1));
+    else if (e.key === 'ArrowUp') setHi((h) => Math.max(0, h - 1));
+    else if (e.key === 'Enter' || e.key === ' ') choose(hi);
+    else if (e.key === 'Escape' || e.key === 'Tab') setOpen(false);
+  };
+
   return (
-    <label className="row select-row">
-      <span className="row-label">{label}</span>
-      <span className="row-value">
-        {current}
-        <ChevronUpDown className="row-icon" />
-      </span>
-      <select value={value} aria-label={label} onChange={(e) => onChange(e.target.value as T)}>
-        {options.map((o) => (
-          <option key={o.value} value={o.value} disabled={o.disabled}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <>
+      <button
+        ref={btn}
+        type="button"
+        className={`row select-row ${open ? 'open' : ''}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => (open ? setOpen(false) : show())}
+        onKeyDown={onKey}
+      >
+        <span className="row-label">{label}</span>
+        <span className="row-value">
+          {current}
+          <ChevronUpDown className="row-icon" />
+        </span>
+      </button>
+      {open && (
+        <div ref={menu} id={listId} role="listbox" aria-label={label} className="select-menu" style={{ position: 'fixed', ...pos }}>
+          {options.map((o, i) => (
+            <div
+              key={o.value}
+              role="option"
+              aria-selected={o.value === value}
+              aria-disabled={o.disabled}
+              className={`select-option ${i === hi ? 'hi' : ''} ${o.value === value ? 'on' : ''}`}
+              onPointerEnter={() => setHi(i)}
+              onClick={() => choose(i)}
+            >
+              {o.label}
+              {o.value === value && <span className="select-tick">✓</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 
