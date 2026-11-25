@@ -22,7 +22,7 @@ export const FINISHES: Record<Finish, { color: string; rough: number; metal: num
   granite: { color: '#c4c3bf', rough: 0.62, metal: 0, irid: 0, stone: 'granite' },
   blackGranite: { color: '#3a3a3d', rough: 0.38, metal: 0, irid: 0, stone: 'blackGranite', label: 'Black granite' },
   marble: { color: '#ecebe7', rough: 0.28, metal: 0, irid: 0, stone: 'marble' },
-  concrete: { color: '#bebbb5', rough: 0.9, metal: 0, irid: 0, stone: 'concrete' },
+  concrete: { color: '#b9b6b0', rough: 0.95, metal: 0, irid: 0, stone: 'concrete' },
 };
 
 /* ---------- stone, drawn in code: an albedo, a roughness and a relief map per stone ---------- */
@@ -47,10 +47,7 @@ function stoneMaps(kind: Stone) {
   const A = mk(), R = mk(), B = mk();
   const n1 = noise2(11), n2 = noise2(23), n3 = noise2(37), r = rand(91);
   const fbm = (x: number, y: number, n = n1) => n(x, y) * 0.5 + n(x * 2.03, y * 2.03) * 0.25 + n(x * 4.1, y * 4.1) * 0.125 + n(x * 8.3, y * 8.3) * 0.0625;
-  // concrete's formwork: board edges across the sheet (110 to 170 px wide) and a tone for each board
-  const planks: number[] = [];
-  for (let x = -40; x < N + 200; x += 110 + r() * 60) planks.push(x);
-  const plankTone = planks.map(() => (r() - 0.5) * 0.12);
+
   for (let y = 0; y < N; y++)
     for (let x = 0; x < N; x++) {
       const i = (y * N + x) * 4;
@@ -72,17 +69,14 @@ function stoneMaps(kind: Stone) {
         rough = 0.25 + (1 - v1) * 0.2;
         h = 0.5 + (1 - v1) * -0.15;
       } else {
-        // board-formed concrete: vertical formwork planks (each its own tone, wood grain pressed in), thin seams where the
-        // boards met, mottled cement and fine sand; the air-bubble pits are drawn on afterwards
-        const cloud = fbm(x / 140, y / 140), sand = n2(x / 1.6, y / 1.6);
-        let pi = 0;
-        while (pi < planks.length - 1 && x > planks[pi + 1] + Math.sin(y / 90 + pi) * 2) pi++;
-        const edge = Math.min(Math.abs(x - planks[pi] - Math.sin(y / 90 + pi) * 2), Math.abs(x - (planks[pi + 1] ?? N * 2) - Math.sin(y / 90 + pi + 1) * 2));
-        const grain = n3(x / 2.5 + pi * 13, y / 55) - 0.5; // long vertical streaks from the timber
-        a = 0.99 + plankTone[pi] * 0.6 + (cloud - 0.5) * 0.28 + (sand - 0.5) * 0.12 + grain * 0.11;
-        rough = 0.92;
-        h = 0.5 + (sand - 0.5) * 0.25 + grain * 0.22 + (cloud - 0.5) * 0.15;
-        if (edge < 1.3) { a *= 0.84; h -= 0.2; } // the seam: faint, as on real board-formed concrete
+        // raw cast concrete: heavy cloudy staining, aggregate grains (light and dark stones) and fine sand, rough all over;
+        // the air-bubble pits are drawn on afterwards
+        const cloud = fbm(x / 130, y / 130), stain = fbm(x / 45 + 7, y / 45), sand = n2(x / 1.4, y / 1.4);
+        const agg = n3(x / 3.2, y / 3.2), coarse = n2(x / 9 + 3, y / 9);
+        a = 0.98 + (cloud - 0.5) * 0.5 + (stain - 0.5) * 0.22 + (sand - 0.5) * 0.2;
+        if (agg > 0.8) a += 0.16; else if (agg < 0.16) a -= 0.2; // aggregate: pale and dark grains
+        rough = 0.96;
+        h = 0.5 + (sand - 0.5) * 0.45 + (coarse - 0.5) * 0.35 + (cloud - 0.5) * 0.2 + (agg > 0.8 ? 0.12 : 0);
       }
       const av = Math.max(0, Math.min(255, a * 160)), rv = Math.max(0, Math.min(255, rough * 255)), hv = Math.max(0, Math.min(255, h * 255));
       A.img.data[i] = A.img.data[i + 1] = A.img.data[i + 2] = av; A.img.data[i + 3] = 255;
@@ -92,13 +86,20 @@ function stoneMaps(kind: Stone) {
   // concrete pores: a few soft dark pits drawn on top
   for (const M of [A, R, B]) M.x.putImageData(M.img, 0, 0);
   if (kind === 'concrete') {
-    // air-bubble pits: small, dark, sunk into the surface; most tiny, a few larger
-    for (let k = 0; k < 1100; k++) {
-      const x = r() * N, y = r() * N, rad = 0.6 + Math.pow(r(), 5) * 3.4; // mostly pin-pricks, the odd bigger one
-      A.x.fillStyle = `rgba(52, 50, 47, ${0.4 + r() * 0.35})`;
+    // air-bubble pits: lots of them, sunk deep; mostly small, some larger, a few gathered in clusters
+    const pit = (x: number, y: number, rad: number) => {
+      A.x.fillStyle = `rgba(38, 36, 34, ${0.55 + r() * 0.4})`;
       A.x.beginPath(); A.x.arc(x, y, rad, 0, Math.PI * 2); A.x.fill();
-      B.x.fillStyle = 'rgba(0, 0, 0, 0.85)';
-      B.x.beginPath(); B.x.arc(x, y, rad, 0, Math.PI * 2); B.x.fill();
+      B.x.fillStyle = '#000';
+      B.x.beginPath(); B.x.arc(x, y, rad * 1.1, 0, Math.PI * 2); B.x.fill();
+      // a pale lip on the lit side, so the pit reads as a hole, not a dot
+      A.x.strokeStyle = 'rgba(255, 255, 255, 0.25)'; A.x.lineWidth = Math.max(0.6, rad * 0.35);
+      A.x.beginPath(); A.x.arc(x + rad * 0.25, y + rad * 0.25, rad, Math.PI * 0.1, Math.PI * 0.9); A.x.stroke();
+    };
+    for (let k = 0; k < 2600; k++) pit(r() * N, r() * N, 0.7 + Math.pow(r(), 3.5) * 5.5);
+    for (let c = 0; c < 26; c++) {
+      const cx = r() * N, cy = r() * N;
+      for (let k = 0; k < 14; k++) pit(cx + (r() - 0.5) * 60, cy + (r() - 0.5) * 60, 0.8 + r() * 2.6);
     }
   }
   const tex = (c: HTMLCanvasElement, srgb: boolean) => { const t = new THREE.CanvasTexture(c); t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 8; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; };
@@ -528,7 +529,7 @@ export class CoinScene {
       m.roughness = THREE.MathUtils.clamp(F.rough + p.roughness, 0.05, 1) * 1.6;
       m.roughnessMap = S.rough;
       m.bumpMap = S.bump;
-      m.bumpScale = F.stone === 'concrete' ? 3 : 1.2; // concrete: deep pits and seams
+      m.bumpScale = F.stone === 'concrete' ? 5.5 : 1.2; // concrete: rough and deeply pitted
       m.anisotropy = 0;
       m.anisotropyMap = null;
       m.clearcoat = F.stone === 'marble' ? 0.35 : 0;
