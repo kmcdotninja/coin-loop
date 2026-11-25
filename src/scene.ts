@@ -596,7 +596,15 @@ export class CoinScene {
     this.frame();
   }
 
+  private lastSize = { w: 2, h: 2 };
+  /** While the stage is animating its size, render at 1× so every frame keeps up; back to sharp when it settles. */
+  setMoving(moving: boolean) {
+    this.renderer.setPixelRatio(moving ? 1 : Math.min(2, window.devicePixelRatio));
+    this.resize(this.lastSize.w, this.lastSize.h);
+  }
+
   resize(w: number, h: number) {
+    this.lastSize = { w, h };
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();

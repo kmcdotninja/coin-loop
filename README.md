@@ -18,6 +18,7 @@ npm run dev        # opens http://localhost:4848
 ### The panel
 
 - Every group folds: click its title, or use **Collapse all** at the top. The panel remembers what you left open.
+- Hide the whole panel with the icon in its header, so the stage (or the landing page) takes the full width; the icon in the stage's corner brings it back.
 - **Double-click any slider's value** to type an exact number. Typed numbers can go beyond the slider's range.
 - Nothing is decided for you. Picking a shape changes only the shape, and **Suggest framing for this shape** is there when you want a starting point.
 

@@ -63,6 +63,16 @@ const LAYOUT_SHAPE: Partial<Record<Layout, Partial<Record<CoinParams['shape'], P
   },
 };
 
+/** A window with its side panel: the icon for showing and hiding the panel. */
+function PanelIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
+      <rect x="2" y="3" width="14" height="12" rx="2.5" />
+      <path d="M11 3v12" />
+    </svg>
+  );
+}
+
 /** Small drawings of each layout: where the text sits (lines) and where the coins go (dots). */
 function LayoutIcon({ layout }: { layout: Layout }) {
   const parts = {
@@ -144,6 +154,17 @@ export default function App() {
   const [page, setPage] = useState<LandingParams>({ ...LANDING, ...saved.page, colors: { ...LANDING.colors, ...saved.page?.colors }, text: { ...LANDING.text, ...saved.page?.text } });
   const [aspect, setAspect] = useState<Aspect>(saved.aspect ?? 'Fill');
   const [paused, setPaused] = useState(false);
+  // the side panel folds away so the stage (and the landing page) can use the whole width
+  const [panelOpen, setPanelOpen] = useState(() => store.get<boolean>('coin-loop.panel', true));
+  useEffect(() => store.set('coin-loop.panel', panelOpen), [panelOpen]);
+  // while the panel opens or closes the stage resizes every frame: render light until the motion settles
+  const firstPanel = useRef(true);
+  useEffect(() => {
+    if (firstPanel.current) return void (firstPanel.current = false);
+    scene.current?.setMoving(true);
+    const t = setTimeout(() => scene.current?.setMoving(false), 460);
+    return () => clearTimeout(t);
+  }, [panelOpen]);
   const [rec, setRec] = useState<null | number>(null);
   const [loading, setLoading] = useState(true);
   const studioHost = useRef<HTMLDivElement>(null);
@@ -326,9 +347,14 @@ export default function App() {
 
   return (
     <div className="app">
-      <div className="workspace">
+      <div className={`workspace ${panelOpen ? '' : 'panel-closed'}`}>
         <div className="rl-main">
           <section className="card cl-stage-card" style={{ background: mode === 'studio' ? p.background : page.colors.bg }}>
+            {!panelOpen && (
+              <button className="cl-panel-open" onClick={() => setPanelOpen(true)} aria-label="Show the panel" title="Show the panel">
+                <PanelIcon />
+              </button>
+            )}
             {mode === 'studio' ? (
               <div className="cl-stage cl-drag" ref={studioHost} onPointerDown={(ev) => dragFrom(ev, onDrag)}
                 title="Drag to move the coins. Scroll or pinch to zoom; hold Option to bring them nearer">
@@ -369,6 +395,9 @@ export default function App() {
             <h1>Coin Loop</h1>
             <span className={`cl-saved ${Date.now() - savedAt < 1800 ? 'on' : ''}`} key={savedAt}>Saved</span>
             <FoldAll key={mode} panel={panelRef} />
+            <button className="cl-panel-close" onClick={() => setPanelOpen(false)} aria-label="Hide the panel" title="Hide the panel">
+              <PanelIcon />
+            </button>
           </header>
           <div className="panel-body">
             <div className="cl-modes" role="tablist" aria-label="View">
