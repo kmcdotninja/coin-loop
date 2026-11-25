@@ -68,7 +68,7 @@ const PRESETS: { name: string; p: Partial<CoinParams> }[] = [
   { name: 'Silver', p: { finishes: ['silver'], clearcoat: 0.45, roughness: 0, scratches: 0.6, brushed: 0.15, exposure: 1 } },
   { name: 'Chrome', p: { finishes: ['chrome'], clearcoat: 0.6, roughness: 0, scratches: 0.25, brushed: 0.1, exposure: 1.05 } },
   { name: 'Candy', p: { finishes: ['silver', 'violet', 'coral'], clearcoat: 0.3, scratches: 0.2, brushed: 0.2, exposure: 1.1 } },
-  { name: 'Gold', p: { finishes: ['gold'], relief: 'raised', clearcoat: 0, scratches: 0.25, brushed: 0.3, roughness: 0.08, exposure: 0.95 } },
+  { name: 'Gold', p: { finishes: ['gold', 'silver'], clearcoat: 0.3, scratches: 0.45, brushed: 0.3, exposure: 1 } },
   { name: 'Graphite', p: { finishes: ['graphite', 'silver'], clearcoat: 0.2, scratches: 0.5, brushed: 0.3, exposure: 1.1 } },
 ];
 
