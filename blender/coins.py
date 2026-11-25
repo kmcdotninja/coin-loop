@@ -17,7 +17,6 @@ R, T = 1.0, 0.16          # radius, thickness
 FACE_R, RECESS = 0.84, 0.022  # the field inside the rim, and how far it sits below the rim
 ENGRAVE = 0.042            # symbol depth below the field (engraved coins)
 RAISE = 0.02               # symbol height above the field (raised coins); the rim stands 0.022 proud
-SLAB_T, SLAB_RAISE = 0.42, 0.075  # concrete: a thick block, the symbol a chunky raised block on a flat face
 REEDS = 120                # grooves around the edge
 GLYPH_H = 0.92             # symbol height (the face is 1.68 across)
 
@@ -113,33 +112,28 @@ def glyph_mesh(ch, size):
     return m, len(m.data.vertices)
 
 made = []
-for (code, ch), relief in [(c, r) for r in ('engraved', 'raised', 'slab') for c in COINS]:
-    raised, slab = relief == 'raised', relief == 'slab'
-    coin = cylinder(R, SLAB_T if slab else T, verts=96 if slab else 120)
-    coin.name = f'coin_{code}' + {'engraved': '', 'raised': '_raised', 'slab': '_slab'}[relief]
+for (code, ch), relief in [(c, r) for r in ('engraved', 'raised') for c in COINS]:
+    raised = relief == 'raised'
+    coin = cylinder(R, T)
+    coin.name = f'coin_{code}' + ('_raised' if raised else '')
     # the field: recessed inside the rim, on both faces
     for s in (1, -1):
-        if slab: break  # concrete: a flat face, no rim
         boolean(coin, cylinder(FACE_R, RECESS * 2, z=s * T / 2, verts=120))
-    # the reeded edge: thin boxes around the rim, joined into one cutter (not on concrete: it's cast, not minted)
+    # the reeded edge: thin boxes around the rim, joined into one cutter
     cut = []
-    for i in range(0 if slab else REEDS):
+    for i in range(REEDS):
         a = 2 * math.pi * i / REEDS
         bpy.ops.mesh.primitive_cube_add(size=1, location=(R * math.cos(a), R * math.sin(a), 0), rotation=(0, 0, a))
         b = bpy.context.object; b.scale = (0.018, 0.009, T * 0.72); cut.append(b)
-    if cut:
-        bpy.ops.object.select_all(action='DESELECT')
-        for b in cut: b.select_set(True)
-        bpy.context.view_layer.objects.active = cut[0]; bpy.ops.object.join()
-        boolean(coin, bpy.context.object)
+    bpy.ops.object.select_all(action='DESELECT')
+    for b in cut: b.select_set(True)
+    bpy.context.view_layer.objects.active = cut[0]; bpy.ops.object.join()
+    boolean(coin, bpy.context.object)
     # the symbol on both faces (mirrored on the back so it reads correctly there): engraved into the field, or raised
     # from it in relief, its top just under the rim so a coin still lies flat on its rim
     for s in (1, -1):
         g, n = glyph_mesh(ch, 1.0)
-        if slab:
-            g.scale = (s, 1, (SLAB_RAISE + 0.03) / 2)  # a chunky block standing on the flat face, sunk 0.03 into it so the
-            g.location = (0, 0, s * (SLAB_T / 2 + SLAB_RAISE / 2 - 0.015))  # union is clean (no slivers where they meet)
-        elif raised:
+        if raised:
             g.scale = (s, 1, RAISE / 2)  # extrude=1 spans -1..1: RAISE tall, centred so it stands on the field
             g.location = (0, 0, s * (T / 2 - RECESS + RAISE / 2 - 0.001))
         else:
@@ -147,16 +141,14 @@ for (code, ch), relief in [(c, r) for r in ('engraved', 'raised', 'slab') for c 
             g.location = (0, 0, s * (T / 2 - RECESS))
         bpy.context.view_layer.objects.active = g; bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
         outward(g)  # the mirror (negative scale) turns the solid inside out
-        boolean(coin, g, 'UNION' if raised or slab else 'DIFFERENCE')
+        boolean(coin, g, 'UNION' if raised else 'DIFFERENCE')
     outward(coin)  # booleans can leave walls wound inward: the browser culls those, so make every face point out
     # soft bevels on every hard edge, then smooth shading that keeps the flats flat
-    bv = coin.modifiers.new('bevel', 'BEVEL'); bv.width = 0.035 if slab else 0.014; bv.segments = 3 if slab else 4; bv.profile = 0.5 if slab else 0.6; bv.limit_method = 'ANGLE'; bv.angle_limit = math.radians(40)  # concrete: soft, worn edges
-    bv.harden_normals = not slab
-    if not slab:
-        wn = coin.modifiers.new('wn', 'WEIGHTED_NORMAL'); wn.keep_sharp = True
+    bv = coin.modifiers.new('bevel', 'BEVEL'); bv.width = 0.014; bv.segments = 4; bv.profile = 0.6; bv.limit_method = 'ANGLE'; bv.angle_limit = math.radians(40)
+    bv.harden_normals = True
+    wn = coin.modifiers.new('wn', 'WEIGHTED_NORMAL'); wn.keep_sharp = True
     bpy.context.view_layer.objects.active = coin
-    if slab: bpy.ops.object.shade_smooth_by_angle(angle=math.radians(32))  # the block: flat faces stay flat, soft edges smooth
-    else: bpy.ops.object.shade_smooth()
+    bpy.ops.object.shade_smooth()
     apply_all(coin)
     # tidy what the booleans left: zero-area slivers shade as creases across flat faces
     bm = bmesh.new(); bm.from_mesh(coin.data)
@@ -169,11 +161,6 @@ for (code, ch), relief in [(c, r) for r in ('engraved', 'raised', 'slab') for c 
     field = T / 2 - RECESS
     for v in me.vertices:
         z, rad = abs(v.co.z), math.hypot(v.co.x, v.co.y)
-        if slab:
-            if z > SLAB_T / 2 + 0.01: k = 1.0  # the raised symbol's top
-            elif z > SLAB_T / 2 - 0.004: k = 0.9  # the face
-            else: k = 0.8  # the thick sides, a touch darker
-            col.data[v.index].color = (k, k, k, 1); continue
         if raised:
             if rad > FACE_R + 0.01: k = 1.0  # rim and edge
             elif z > field + 0.004: k = 1.0  # the raised symbol: the brightest, polished
@@ -197,14 +184,14 @@ bpy.ops.wm.save_as_mainfile(filepath=BLEND)  # open this in Blender to look arou
 # a preview: every coin, engraved and raised, tilted, lit in Workbench (shape check only)
 scn = bpy.context.scene; scn.render.engine = 'BLENDER_WORKBENCH'; scn.display.shading.light = 'MATCAP'
 scn.display.shading.color_type = 'SINGLE'; scn.display.shading.single_color = (0.8, 0.8, 0.82)
-scn.render.resolution_x, scn.render.resolution_y = 1800, 1100
+scn.render.resolution_x, scn.render.resolution_y = 1800, 760
 scn.display.shading.light = 'STUDIO'; scn.display.shading.show_cavity = True
-# engraved coins on the top row, raised in the middle, the concrete blocks below
+# engraved coins on the top row, raised below
 for o in bpy.data.objects:
     if o.name.startswith('coin_'): o.hide_render = False
 for k, (code, _) in enumerate(COINS):
-    for row, suffix in enumerate(('', '_raised', '_slab')):
-        o = bpy.data.objects['coin_' + code + suffix]; o.location = ((k - 3) * 2.2, 0, 2.3 - row * 2.3); o.rotation_euler = (math.radians(65), 0, 0)
+    for row, suffix in enumerate(('', '_raised')):
+        o = bpy.data.objects['coin_' + code + suffix]; o.location = ((k - 3) * 2.2, 0, 1.15 - row * 2.3); o.rotation_euler = (math.radians(65), 0, 0)
 cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam')); scn.collection.objects.link(cam); scn.camera = cam
 cam.location = (0, -16, 0); cam.rotation_euler = (math.radians(90), 0, 0); cam.data.lens = 50
 scn.render.filepath = os.path.join(os.path.dirname(BLEND), 'preview.png'); bpy.ops.render.render(write_still=True)

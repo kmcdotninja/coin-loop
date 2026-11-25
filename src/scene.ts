@@ -485,7 +485,7 @@ export class CoinScene {
     gltf.scene.traverse((o) => {
       const m = o as THREE.Mesh;
       const key = m.name?.replace('coin_', '') ?? '';
-      if (m.isMesh && CURRENCIES.includes(key.replace(/_(raised|slab)$/, '') as Currency)) {
+      if (m.isMesh && CURRENCIES.includes(key.replace(/_raised$/, '') as Currency)) {
         const g = m.geometry.clone();
         planarUV(g);
         this.geos.set(key, g);
@@ -583,10 +583,7 @@ export class CoinScene {
       const cur = p.currencies.length ? p.currencies : (['USD'] as Currency[]);
       this.coins = Array.from({ length: p.count }, (_, i) => {
         const code = cur[i % cur.length];
-        const fin = FINISHES[finishes[i % finishes.length]];
-        // concrete is cast, not minted: a thick block with a chunky raised symbol (coin_XXX_slab)
-        const geo = (fin.stone === 'concrete' && this.geos.get(code + '_slab')) || (p.relief === 'raised' && this.geos.get(code + '_raised')) || this.geos.get(code)!;
-        const mesh = new THREE.Mesh(geo, this.mats.get(finishes[i % finishes.length])!);
+        const mesh = new THREE.Mesh((p.relief === 'raised' && this.geos.get(code + '_raised')) || this.geos.get(code)!, this.mats.get(finishes[i % finishes.length])!);
         mesh.frustumCulled = false; // ~30 coins: cheaper to draw than to risk a wrong cull
         this.ring.add(mesh);
         return mesh;

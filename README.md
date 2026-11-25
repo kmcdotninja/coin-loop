@@ -63,7 +63,7 @@ Each coin goes through these steps:
 3. The symbol engraved into both faces. It is mirrored on the back so it reads correctly there. Each outline of the glyph becomes its own solid, so fonts with overlapping strokes still cut cleanly.
 4. Soft bevels on every hard edge, so edges catch the light.
 
-Every coin is built three times: with the symbol engraved, with it raised in relief (`coin_USD_raised`), and as a concrete block (`coin_USD_slab`): thick, no reeded edge, soft worn bevels and a chunky raised symbol, because concrete is cast, not minted. A last pass dissolves the zero-area slivers booleans leave, which would otherwise shade as creases.
+Every coin is built twice: with the symbol engraved, and with it raised in relief (`coin_USD_raised`). A last pass dissolves the zero-area slivers booleans leave, which would otherwise shade as creases.
 5. "Cavity" shading baked into the vertex colours, darker inside the engraving. A polished engraving only reads when its recess is darker, as on a real struck coin.
 
 Try changing `R`, `T`, `REEDS`, `ENGRAVE` or `GLYPH_H` at the top of the script, or add a currency to `COINS`.
@@ -78,7 +78,7 @@ Try changing `R`, `T`, `REEDS`, `ENGRAVE` or `GLYPH_H` at the top of the script,
 | `src/controls.tsx` | The panel's rows: sliders, colours, toggles |
 
 - **The loop.** Each coin sits at a point along a path (0 to 1) that moves forward with time. Ring and infinity are closed curves. Helix, DNA and wave run off the edges of the frame and wrap round where you can't see. Twist and spins use whole turns, so the last frame flows into the first and every loop is seamless.
-- **The stone.** Granite, marble and concrete are drawn in code (concrete as light cast cement with soft mottling and a few small pores, on its own block shape): a colour map, a roughness map and a relief map, made from layered noise. The coin faces get the texture flat, like a stamp, and the rim gets it wrapped round like a label.
+- **The stone.** Granite, marble and concrete are drawn in code (concrete as light cast cement with soft mottling and a few small pores): a colour map, a roughness map and a relief map, made from layered noise. The coin faces get the texture flat, like a stamp, and the rim gets it wrapped round like a label.
 - **The metal.** A `MeshPhysicalMaterial` with metalness 1, plus a roughness map drawn in code (fine circular brushing and hundreds of hairline scratches) and a clear coat.
 - **The light.** This is what makes silver look like silver. A polished metal has no colour of its own; it shows what it reflects. "Product strips" paints a studio into an HDR image: tall soft boxes and a curved backdrop band on black. The coins mirror black with sharp white streaks, like product photography. Switch to the photo studios in **Light** to compare.
 
