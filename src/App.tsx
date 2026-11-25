@@ -123,8 +123,10 @@ export default function App() {
     const wheel = (ev: WheelEvent) => {
       const stage = (ev.target as HTMLElement).closest('.cl-stage-card');
       if (!stage) return;
-      if (ev.ctrlKey || mode === 'studio') ev.preventDefault(); // never zoom the browser page over the stage
-      if (mode !== 'studio') return; // the landing page doesn't zoom
+      // the landing page only moves the coins on purpose: a pinch zooms, Option + scroll brings them nearer or further;
+      // a plain scroll there does nothing (so it can't nudge the coins by accident)
+      if (mode !== 'studio' && !ev.ctrlKey && !ev.altKey) return;
+      ev.preventDefault(); // never zoom or scroll the browser page over the stage
       const { p, e } = live.current;
       if (ev.altKey) return e({ offsetZ: Math.max(-30, Math.min(16, +((p.offsetZ ?? 0) - ev.deltaY * (ev.ctrlKey ? 0.08 : 0.02)).toFixed(2))) });
       e({ zoom: clampZoom(p.zoom * Math.exp(-ev.deltaY * (ev.ctrlKey ? 0.01 : 0.0015))) });
@@ -241,7 +243,7 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              {mode === 'studio' && (
+              {(
               <div className="cl-zoom" aria-label="Zoom">
                 <button aria-label="Zoom out" onClick={() => e({ zoom: clampZoom(p.zoom / 1.2) })}>−</button>
                 <button className="cl-zoom-value" title="Reset zoom" onClick={() => e({ zoom: (mode === 'studio' ? DEFAULTS : LANDING_COINS).zoom })}>
@@ -319,12 +321,14 @@ export default function App() {
             )}
 
             {mode === 'landing' && (
-              <Group title="Position" action={<button className="text-btn" onClick={() => e({ offsetX: LANDING_COINS.offsetX, offsetY: LANDING_COINS.offsetY, offsetZ: LANDING_COINS.offsetZ })}>Reset</button>}>
+              <Group title="Position" action={<button className="text-btn" onClick={() => e({ offsetX: LANDING_COINS.offsetX, offsetY: LANDING_COINS.offsetY, offsetZ: LANDING_COINS.offsetZ, zoom: LANDING_COINS.zoom, size: LANDING_COINS.size })}>Reset</button>}>
                 <SliderRow label="X  across" value={p.offsetX} min={-20} max={20} step={0.05} onChange={(v) => e({ offsetX: v })} format={(v) => v.toFixed(2)} />
                 <SliderRow label="Y  up" value={p.offsetY} min={-30} max={8} step={0.05} onChange={(v) => e({ offsetY: v })} format={(v) => v.toFixed(2)} />
-                <SliderRow label="Z  nearer" value={p.offsetZ ?? 0} min={-30} max={16} step={0.05} onChange={(v) => e({ offsetZ: v })} format={(v) => v.toFixed(2)} />
+                <SliderRow label="Nearer / further" value={p.offsetZ ?? 0} min={-30} max={16} step={0.05} onChange={(v) => e({ offsetZ: v })} format={(v) => (v > 0 ? '+' : '') + v.toFixed(2)} />
+                <SliderRow label="Zoom" value={p.zoom} min={0.4} max={5} step={0.01} onChange={(v) => e({ zoom: v })} format={(v) => `${Math.round(v * 100)}%`} />
+                <SliderRow label="Coin size" value={p.size} min={0.4} max={3} step={0.01} onChange={(v) => e({ size: v })} format={(v) => v.toFixed(2)} />
                 <button className="btn-panel" onClick={() => fitBelowText()}>Keep clear of text</button>
-                <p className="rl-note">Or drag the coins on the page. Keep clear of text places them under the button: the ring sweeps off the bottom, other shapes fit the space below. Use it again after changing the text or its size.</p>
+                <p className="rl-note">Drag the coins on the page to move them. Pinch to zoom; hold Option (⌥) and scroll to bring them nearer or further. Keep clear of text tucks them under the button (picking a shape does this too); after that, everything is yours to change.</p>
               </Group>
             )}
 
