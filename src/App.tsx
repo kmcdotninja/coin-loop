@@ -26,6 +26,9 @@ const SHAPE_START: Record<CoinParams['shape'], Partial<CoinParams>> = {
   helix: { shape: 'helix', size: 1.2, radius: 9, turns: 3, length: 40, tilt: 0, dutch: -18, offsetX: 0, offsetY: 0, offsetZ: 0, zoom: 1.25, lean: 15, count: 28, twist: 0 },
   dna: { shape: 'dna', size: 0.9, radius: 9, turns: 2, length: 36, tilt: 0, dutch: -22, offsetX: 0, offsetY: 0, offsetZ: 0, zoom: 1.05, lean: 8, count: 64, twist: 0 },
   wave: { shape: 'wave', size: 1.5, radius: 9, turns: 2, length: 40, tilt: 25, dutch: -8, offsetX: 0, offsetY: 0, offsetZ: 0, zoom: 1.3, lean: 35, count: 24, twist: 1 },
+  market: { shape: 'market', size: 1.2, radius: 9, turns: 3, length: 44, tilt: 0, dutch: 0, offsetX: 0, offsetY: 0, offsetZ: 0, zoom: 1.2, lean: 30, count: 30, twist: 0 },
+  orbit: { shape: 'orbit', size: 1.3, radius: 8, tilt: 16, dutch: -4, offsetX: 0, offsetY: 0, offsetZ: 0, zoom: 1.3, lean: 20, count: 24, twist: 0 },
+  cradle: { shape: 'cradle', size: 1.25, radius: 11, length: 40, tilt: 0, dutch: 0, offsetX: 0, offsetY: -5, offsetZ: 0, zoom: 1.15, lean: 30, count: 32, twist: 0 },
   infinity: { shape: 'infinity', size: 1.3, radius: 9, tilt: 20, dutch: -6, offsetX: 0, offsetY: 0, offsetZ: 0, zoom: 1.2, lean: 30, count: 28, twist: 0 },
 };
 
@@ -36,6 +39,9 @@ const SHAPE_LANDING: Record<CoinParams['shape'], Partial<CoinParams>> = {
   wave: { shape: 'wave', size: 1.35, radius: 7, turns: 2, length: 64, tilt: 20, dutch: -3, offsetX: 0, offsetZ: 0, zoom: 0.89, lean: 35, count: 34, twist: 1 },
   helix: { shape: 'helix', size: 1.05, radius: 6, turns: 5, length: 64, tilt: 0, dutch: -3, offsetX: 0, offsetZ: 0, zoom: 0.89, lean: 12, count: 44, twist: 0 },
   dna: { shape: 'dna', size: 0.8, radius: 6.5, turns: 4, length: 64, tilt: 0, dutch: -3, offsetX: 0, offsetZ: 0, zoom: 0.89, lean: 8, count: 80, twist: 0 },
+  market: { shape: 'market', size: 1.1, radius: 8, turns: 3, length: 64, tilt: 0, dutch: 0, offsetX: 0, offsetZ: 0, zoom: 0.89, lean: 30, count: 40, twist: 0 },
+  orbit: { shape: 'orbit', size: 1.2, radius: 10, tilt: 10, dutch: 0, offsetX: 0, offsetZ: 0, zoom: 0.89, lean: 20, count: 30, twist: 0 },
+  cradle: { shape: 'cradle', size: 1.15, radius: 10, length: 26, tilt: 0, dutch: 0, offsetX: 0, offsetZ: 0, zoom: 0.89, lean: 30, count: 30, twist: 0 },
   infinity: { shape: 'infinity', size: 1, radius: 7.5, tilt: 35, dutch: 0, offsetX: 0, offsetZ: 0, zoom: 0.89, lean: 30, count: 30, twist: 0 },
 };
 
@@ -47,6 +53,9 @@ function ShapeIcon({ shape }: { shape: CoinParams['shape'] }) {
     dna: 'M2 7c4 0 6 10 10 10s6-10 10-10M2 17c4 0 6-10 10-10s6 10 10 10M7 9v6M12 7v10M17 9v6',
     wave: 'M2 12c2.5-5 5-5 7.5 0s5 5 7.5 0 3-4 5-3',
     infinity: 'M12 12c-2-3-4-5-6.5-5a5 5 0 0 0 0 10c2.5 0 4.5-2 6.5-5s4-5 6.5-5a5 5 0 0 1 0 10c-2.5 0-4.5-2-6.5-5z',
+    market: 'M2 18l4-5 3 3 4-7 3 4 6-8',
+    orbit: 'M21 12c0 2.2-4 4-9 4s-9-1.8-9-4 4-4 9-4 9 1.8 9 4z',
+    cradle: 'M3 4c1 9 5 15 9 15s8-6 9-15',
   }[shape];
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
@@ -59,7 +68,7 @@ const PRESETS: { name: string; p: Partial<CoinParams> }[] = [
   { name: 'Silver', p: { finishes: ['silver'], clearcoat: 0.45, roughness: 0, scratches: 0.6, brushed: 0.15, exposure: 1 } },
   { name: 'Chrome', p: { finishes: ['chrome'], clearcoat: 0.6, roughness: 0, scratches: 0.25, brushed: 0.1, exposure: 1.05 } },
   { name: 'Candy', p: { finishes: ['silver', 'violet', 'coral'], clearcoat: 0.3, scratches: 0.2, brushed: 0.2, exposure: 1.1 } },
-  { name: 'Gold', p: { finishes: ['gold', 'silver'], clearcoat: 0.3, scratches: 0.45, brushed: 0.3, exposure: 1 } },
+  { name: 'Gold', p: { finishes: ['gold'], relief: 'raised', clearcoat: 0, scratches: 0.25, brushed: 0.3, roughness: 0.08, exposure: 0.95 } },
   { name: 'Graphite', p: { finishes: ['graphite', 'silver'], clearcoat: 0.2, scratches: 0.5, brushed: 0.3, exposure: 1.1 } },
 ];
 
@@ -81,6 +90,8 @@ export default function App() {
   if ((saved.render ?? 0) < 4) for (const k of ['studio', 'landing'] as const) delete saved[k]?.speed;
   // once: the landing page's default zoom became 89%
   if ((saved.render ?? 0) < 5 && saved.landing) delete saved.landing.zoom;
+  // once: glints briefly defaulted to on; that was the default, not a choice, so clear it
+  if ((saved.render ?? 0) < 6) for (const k of ['studio', 'landing'] as const) delete (saved[k] as Record<string, unknown> | undefined)?.glints;
   const [mode, setMode] = useState<Mode>(saved.mode ?? 'studio');
   const [ps, setPs] = useState<Record<Mode, CoinParams>>({
     studio: { ...DEFAULTS, ...saved.studio },
@@ -157,7 +168,7 @@ export default function App() {
     const st = stage.getBoundingClientRect();
     const top = cta.getBoundingClientRect().bottom - st.top + 28;
     const bottom = st.height - 70; // leave the stage bar its room
-    e({ ...next, ...s.fitLanding(next, top, bottom, 'top') }); // move only: the zoom (89% by default) is never changed
+    e({ ...next, ...s.fitLanding(next, top, bottom, next.shape === 'cradle' ? 'middle' : 'top') }); // move only: the zoom (89% by default) is never changed
   };
   const host = () => (mode === 'studio' ? studioHost.current : landingHost.current);
 
@@ -175,7 +186,7 @@ export default function App() {
     // the landing page's coins render on the page's own colour, so the photographic passes (which need an opaque frame) work there too
     scene.current?.set(mode === 'landing' ? { ...p, background: themed(page).bg } : p);
     if (!hydrated.current) return; // don't save the defaults over the project file before it has been read
-    const data: Saved = { mode, studio: ps.studio, landing: ps.landing, page, aspect, render: 5, at: Date.now() };
+    const data: Saved = { mode, studio: ps.studio, landing: ps.landing, page, aspect, render: 6, at: Date.now() };
     store.set(KEY, data);
     // also to settings.local.json in the project (while developing), shortly after the last change
     clearTimeout(saveTimer.current);
@@ -193,6 +204,7 @@ export default function App() {
     fetch('/__settings', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : {}))
       .then((f: Saved) => {
+        if (f && f.at && (f.render ?? 0) < 6) for (const k of ['studio', 'landing'] as const) delete (f[k] as Record<string, unknown> | undefined)?.glints;
         if (f && f.at && (!saved.at || f.at > saved.at)) {
           if (f.mode) setMode(f.mode);
           setPs({ studio: { ...DEFAULTS, ...f.studio }, landing: { ...LANDING_COINS, ...f.landing } });
@@ -397,6 +409,7 @@ export default function App() {
                 </div>
               ))}
               <p className="rl-note">Click a finish to make every coin that. ⌘ or Shift-click to add more to a mix, and the coins take them in turn.</p>
+              <SelectRow label="Symbol" value={p.relief} options={[{ value: 'engraved', label: 'Engraved' }, { value: 'raised', label: 'Raised' }]} onChange={(v) => e({ relief: v })} />
               <SliderRow label="Roughness" value={p.roughness} min={-0.5} max={1} onChange={(v) => e({ roughness: v })} format={(v) => (v >= 0 ? '+' : '') + v.toFixed(2)} />
               {p.finishes.some((f) => !FINISHES[f].stone) && (
                 <>
@@ -420,7 +433,7 @@ export default function App() {
 
             <Group title="Path" open={mode === 'studio'}>
               <div className="cl-shapes" role="radiogroup" aria-label="Path shape">
-                {([['ring', 'Ring'], ['helix', 'Helix'], ['dna', 'DNA'], ['wave', 'Wave'], ['infinity', 'Infinity']] as const).map(([id, name]) => (
+                {([['ring', 'Ring'], ['market', 'Market'], ['orbit', 'Orbit'], ['cradle', 'Cradle'], ['wave', 'Wave'], ['helix', 'Helix'], ['dna', 'DNA'], ['infinity', 'Infinity']] as const).map(([id, name]) => (
                   <button key={id} role="radio" aria-checked={(p.shape ?? 'ring') === id} className={(p.shape ?? 'ring') === id ? 'on' : ''}
                     onClick={() => e({ shape: id })}>
                     <ShapeIcon shape={id} />
@@ -431,9 +444,9 @@ export default function App() {
               <button className="btn-panel" onClick={() => (mode === 'landing' ? fitBelowText({ ...p, ...SHAPE_LANDING[p.shape] }) : e(SHAPE_START[p.shape]))}>
                 Suggest framing for this shape
               </button>
-              {['helix', 'dna', 'wave'].includes(p.shape) && (
+              {['helix', 'dna', 'wave', 'market', 'cradle'].includes(p.shape) && (
                 <>
-                  <SliderRow label={p.shape === 'wave' ? 'Waves' : 'Turns'} value={p.turns} min={1} max={24} step={1} onChange={(v) => e({ turns: v })} />
+                  {p.shape !== 'cradle' && <SliderRow label={p.shape === 'wave' ? 'Waves' : p.shape === 'market' ? 'Swings' : 'Turns'} value={p.turns} min={1} max={24} step={1} onChange={(v) => e({ turns: v })} />}
                   <SliderRow label="Length" value={p.length} min={4} max={200} step={1} onChange={(v) => e({ length: v })} format={(v) => v.toFixed(0)} />
                 </>
               )}

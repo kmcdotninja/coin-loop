@@ -27,8 +27,8 @@ The loop on its own: tune it, then press **Record one loop** to save an MP4 that
 
 - **Move the coins:** drag them on the stage.
 - **Zoom:** scroll or pinch, or use **− 100% +** on the stage bar. Hold **Option (⌥)** while scrolling to bring the coins nearer or push them back.
-- **Path:** pick a shape (Ring, Helix, DNA, Wave or Infinity), then **Suggest framing** if you want it set up for you. **Twist** rolls each coin along the path like a ribbon; **Turns** and **Length** set how tightly a helix, DNA or wave coils.
-- **Finish:** click a finish to make every coin that, or ⌘/Shift-click to mix several. There are six metals and four stones: granite, black granite, marble and concrete.
+- **Path:** pick a shape (Ring, Market, Orbit, Cradle, Wave, Helix, DNA or Infinity), then **Suggest framing** if you want it set up for you. Market rises like a stock chart; Orbit is a flat ring seen from a low angle; Cradle is a U that frames whatever sits above it. **Twist** rolls each coin along the path like a ribbon; **Turns** and **Length** set how tightly a helix, DNA or wave coils.
+- **Finish:** click a finish to make every coin that, or ⌘/Shift-click to mix several. There are six metals and four stones: granite, black granite, marble and concrete. **Symbol** sets whether the currency sign is engraved into the coin or raised from it.
 - **Motion:** **Speed** slows or quickens the loop live. **Loop length** is one full cycle, and so the length of a recording.
 
 ### Landing page
@@ -61,6 +61,8 @@ Each coin goes through these steps:
 2. A reeded edge: 120 thin grooves around the rim.
 3. The symbol engraved into both faces. It is mirrored on the back so it reads correctly there. Each outline of the glyph becomes its own solid, so fonts with overlapping strokes still cut cleanly.
 4. Soft bevels on every hard edge, so edges catch the light.
+
+Every coin is built twice: once with the symbol engraved, and once with it raised in relief (`coin_USD_raised`).
 5. "Cavity" shading baked into the vertex colours, darker inside the engraving. A polished engraving only reads when its recess is darker, as on a real struck coin.
 
 Try changing `R`, `T`, `REEDS`, `ENGRAVE` or `GLYPH_H` at the top of the script, or add a currency to `COINS`.

@@ -16,7 +16,7 @@ export const FINISHES: Record<Finish, { color: string; rough: number; metal: num
   silver: { color: '#d8dade', rough: 0.15, metal: 1, irid: 0 },
   chrome: { color: '#eceef2', rough: 0.05, metal: 1, irid: 0 },
   graphite: { color: '#5d6066', rough: 0.3, metal: 1, irid: 0 },
-  gold: { color: '#e6be7a', rough: 0.22, metal: 1, irid: 0 },
+  gold: { color: '#eea83c', rough: 0.2, metal: 1, irid: 0 }, // deep, warm, polished: highlights go near-white on their own
   coral: { color: '#ec6a52', rough: 0.3, metal: 0.85, irid: 0 },
   violet: { color: '#b48cff', rough: 0.26, metal: 0.9, irid: 1 },
   granite: { color: '#c4c3bf', rough: 0.62, metal: 0, irid: 0, stone: 'granite' },
@@ -95,9 +95,10 @@ export interface CoinParams {
   count: number; // on the whole ring
   currencies: Currency[];
   finishes: Finish[]; // cycled coin by coin
+  relief: 'engraved' | 'raised'; // the symbol cut into the face, or standing up from it
   size: number;
   // path
-  shape: 'ring' | 'helix' | 'dna' | 'wave' | 'infinity';
+  shape: 'ring' | 'helix' | 'dna' | 'wave' | 'infinity' | 'market' | 'orbit' | 'cradle';
   turns: number; // helix, DNA and wave: whole turns (or waves) along the length
   length: number; // helix, DNA and wave: how long the path is (world units)
   twist: number; // whole rolls of each coin about the direction of travel, over the path
@@ -133,6 +134,7 @@ export const DEFAULTS: CoinParams = {
   count: 21,
   currencies: ['USD', 'EUR', 'GBP', 'JPY', 'NGN', 'INR', 'BTC'],
   finishes: ['silver'],
+  relief: 'engraved',
   size: 1.7,
   shape: 'ring',
   turns: 3,
@@ -354,6 +356,24 @@ export function pathAt(p: CoinParams, s: number, phase = 0) {
       }
       case 'wave':
         return new THREE.Vector3((t - 0.5) * (p.length ?? 34), Math.sin(TAU * (p.turns ?? 3) * t) * R * 0.32, 0);
+      case 'market': {
+        // a rising market: an uptrend with sharp chart zigzags (two rhythms, so it never looks regular)
+        const tri = (x: number) => 2 * Math.abs(x - Math.floor(x) - 0.5) - 0.5;
+        const N = 6 * (p.turns ?? 3);
+        const L = p.length ?? 34;
+        const y = (t - 0.5) * L * 0.18 + R * 0.2 * tri(t * N) + R * 0.1 * tri(t * N * 2.37 + 0.3);
+        return new THREE.Vector3((t - 0.5) * L, y, 0);
+      }
+      case 'orbit': {
+        // a flat ellipse, like Saturn's ring seen from a low angle (Tilt lifts the far side)
+        const a = TAU * t;
+        return new THREE.Vector3(Math.cos(a) * R * 1.45, 0, Math.sin(a) * R * 0.75);
+      }
+      case 'cradle': {
+        // a U: up the left side, under the middle, up the right; the ends run out of frame
+        const u = 2 * t - 1, L = p.length ?? 34;
+        return new THREE.Vector3(u * L * 0.5, R * 1.1 * Math.pow(Math.abs(u), 2.6), 0);
+      }
       case 'infinity': {
         const a = TAU * t, d = 1 + Math.sin(a) ** 2; // a lemniscate of Bernoulli, gently tipped back
         return new THREE.Vector3((R * 1.5 * Math.cos(a)) / d, (R * 1.5 * Math.sin(a) * Math.cos(a)) / d, (R * 0.35 * Math.sin(a)) / d);
@@ -409,7 +429,7 @@ export class CoinScene {
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(28, 4 / 3, 0.1, 200);
   ring = new THREE.Group();
-  private geos = new Map<Currency, THREE.BufferGeometry>();
+  private geos = new Map<string, THREE.BufferGeometry>(); // 'USD' engraved, 'USD_raised' in relief
   private mats = new Map<string, THREE.MeshPhysicalMaterial>();
   private coins: THREE.Mesh[] = [];
   private maps?: { rough: THREE.Texture; bump: THREE.Texture };
@@ -447,11 +467,11 @@ export class CoinScene {
     const gltf = await new GLTFLoader().setDRACOLoader(draco).loadAsync('/models/coins.glb');
     gltf.scene.traverse((o) => {
       const m = o as THREE.Mesh;
-      const code = m.name?.replace('coin_', '') as Currency;
-      if (m.isMesh && CURRENCIES.includes(code)) {
+      const key = m.name?.replace('coin_', '') ?? '';
+      if (m.isMesh && CURRENCIES.includes(key.replace('_raised', '') as Currency)) {
         const g = m.geometry.clone();
         planarUV(g);
-        this.geos.set(code, g);
+        this.geos.set(key, g);
       }
     });
     draco.dispose();
@@ -538,13 +558,14 @@ export class CoinScene {
 
     this.scene.background = p.background === 'transparent' ? null : new THREE.Color(p.background);
 
-    const layout = `${p.count}|${p.currencies.join()}|${finishes.join()}`;
+    const layout = `${p.count}|${p.currencies.join()}|${finishes.join()}|${p.relief}`;
     if (layout !== (this as any)._layout || !this.coins.length) {
       (this as any)._layout = layout;
       this.coins.forEach((c) => this.ring.remove(c));
       const cur = p.currencies.length ? p.currencies : (['USD'] as Currency[]);
       this.coins = Array.from({ length: p.count }, (_, i) => {
-        const mesh = new THREE.Mesh(this.geos.get(cur[i % cur.length])!, this.mats.get(finishes[i % finishes.length])!);
+        const code = cur[i % cur.length];
+        const mesh = new THREE.Mesh((p.relief === 'raised' && this.geos.get(code + '_raised')) || this.geos.get(code)!, this.mats.get(finishes[i % finishes.length])!);
         mesh.frustumCulled = false; // ~30 coins: cheaper to draw than to risk a wrong cull
         this.ring.add(mesh);
         return mesh;
@@ -632,7 +653,7 @@ export class CoinScene {
 
   /** Where the coins reach on screen (px from the canvas top): the top of the highest coin and the bottom of the lowest,
    *  among those horizontally in frame. */
-  private reach(p: CoinParams, offY: number, zoom: number) {
+  private reach(p: CoinParams, offY: number, zoom: number, middleOnly = false) {
     const h = this.canvas.clientHeight || 1;
     this.ring.rotation.set(THREE.MathUtils.degToRad(-p.tilt), 0, 0);
     this.ring.position.set(p.offsetX, offY, p.offsetZ ?? 0);
@@ -647,6 +668,7 @@ export class CoinScene {
       for (let k = 0; k < 240; k++) {
         const c = this.ring.localToWorld(pathAt(p, k / 240, phase).pos.clone());
         const t = c.clone().add(up).project(this.camera), b = c.clone().sub(up).project(this.camera);
+        if (middleOnly && Math.abs(t.x) > 0.35) continue; // the cradle: only its bottom must clear the text
         if (Math.abs(t.x) <= 1.05 && t.z < 1) top = Math.min(top, ((1 - t.y) / 2) * h);
         if (Math.abs(b.x) <= 1.05 && b.z < 1) bottom = Math.max(bottom, ((1 - b.y) / 2) * h);
       }
@@ -656,10 +678,10 @@ export class CoinScene {
   /** Landing page placement, so the coins never cross the hero text.
    *  'top': the highest coin sits at `topPx` and the rest may run off the bottom (the ring's sweeping arc).
    *  'band': the whole shape is scaled and centred to fit between `topPx` and `bottomPx` (wave, helix, DNA, infinity). */
-  fitLanding(p: CoinParams, topPx: number, bottomPx: number, mode: 'top' | 'band') {
+  fitLanding(p: CoinParams, topPx: number, bottomPx: number, mode: 'top' | 'band' | 'middle') {
     let offY = p.offsetY, zoom = p.zoom;
     for (let iter = 0; iter < 10; iter++) {
-      let r = this.reach(p, offY, zoom);
+      let r = this.reach(p, offY, zoom, mode === 'middle');
       if (!isFinite(r.top)) break;
       if (mode === 'band' && isFinite(r.bottom)) {
         // scale so the shape's height fills the band (screen size grows with zoom)
