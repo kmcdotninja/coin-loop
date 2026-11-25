@@ -18,7 +18,7 @@ const ASPECTS = { Fill: 0, '4:3': 4 / 3, '1:1': 1, '4:5': 4 / 5, '16:9': 16 / 9,
 type Aspect = keyof typeof ASPECTS;
 
 /** The coins on the landing page: a wide, low arc under the hero, on the page's own colour. */
-const LANDING_COINS: CoinParams = { ...DEFAULTS, background: 'transparent', count: 28, size: 1.75, radius: 13, offsetX: 0, offsetY: -16.2, offsetZ: 0, zoom: 1.25, dutch: -6, tilt: 14, lean: 40, loop: 18 };
+const LANDING_COINS: CoinParams = { ...DEFAULTS, background: 'transparent', count: 28, size: 1.75, radius: 13, offsetX: 0, offsetY: -16.2, offsetZ: 0, zoom: 0.89, dutch: -6, tilt: 14, lean: 40, loop: 18 };
 
 /** Picking a shape also frames it: a good starting point you then drag, zoom and angle. */
 const SHAPE_START: Record<CoinParams['shape'], Partial<CoinParams>> = {
@@ -32,11 +32,11 @@ const SHAPE_START: Record<CoinParams['shape'], Partial<CoinParams>> = {
 /** On the landing page the hero text owns the top and middle, so every shape runs flat and sideways in the band below
  *  it (fitBelowText then lowers it until it clears the button). */
 const SHAPE_LANDING: Record<CoinParams['shape'], Partial<CoinParams>> = {
-  ring: { shape: 'ring', size: 1.75, radius: 13, tilt: 14, dutch: -6, offsetX: 0, offsetZ: 0, zoom: 1.25, lean: 40, count: 28, twist: 0 },
-  wave: { shape: 'wave', size: 1.35, radius: 7, turns: 2, length: 64, tilt: 20, dutch: -3, offsetX: 0, offsetZ: 0, zoom: 1.15, lean: 35, count: 34, twist: 1 },
-  helix: { shape: 'helix', size: 1.05, radius: 6, turns: 5, length: 64, tilt: 0, dutch: -3, offsetX: 0, offsetZ: 0, zoom: 1.15, lean: 12, count: 44, twist: 0 },
-  dna: { shape: 'dna', size: 0.8, radius: 6.5, turns: 4, length: 64, tilt: 0, dutch: -3, offsetX: 0, offsetZ: 0, zoom: 1.15, lean: 8, count: 80, twist: 0 },
-  infinity: { shape: 'infinity', size: 1, radius: 7.5, tilt: 35, dutch: 0, offsetX: 0, offsetZ: 0, zoom: 1.25, lean: 30, count: 30, twist: 0 },
+  ring: { shape: 'ring', size: 1.75, radius: 13, tilt: 14, dutch: -6, offsetX: 0, offsetZ: 0, zoom: 0.89, lean: 40, count: 28, twist: 0 },
+  wave: { shape: 'wave', size: 1.35, radius: 7, turns: 2, length: 64, tilt: 20, dutch: -3, offsetX: 0, offsetZ: 0, zoom: 0.89, lean: 35, count: 34, twist: 1 },
+  helix: { shape: 'helix', size: 1.05, radius: 6, turns: 5, length: 64, tilt: 0, dutch: -3, offsetX: 0, offsetZ: 0, zoom: 0.89, lean: 12, count: 44, twist: 0 },
+  dna: { shape: 'dna', size: 0.8, radius: 6.5, turns: 4, length: 64, tilt: 0, dutch: -3, offsetX: 0, offsetZ: 0, zoom: 0.89, lean: 8, count: 80, twist: 0 },
+  infinity: { shape: 'infinity', size: 1, radius: 7.5, tilt: 35, dutch: 0, offsetX: 0, offsetZ: 0, zoom: 0.89, lean: 30, count: 30, twist: 0 },
 };
 
 /** Small drawings of each path shape for the picker. */
@@ -78,6 +78,8 @@ export default function App() {
   if ((saved.render ?? 0) < 3) for (const k of ['studio', 'landing'] as const) for (const f of ['quality', 'tone', 'bloom', 'grain', 'focus', 'vignette', 'keyLight', 'occlusion', 'shadowSoftness']) delete (saved[k] as Record<string, unknown> | undefined)?.[f];
   // once: the default speed became 0.1×
   if ((saved.render ?? 0) < 4) for (const k of ['studio', 'landing'] as const) delete saved[k]?.speed;
+  // once: the landing page's default zoom became 89%
+  if ((saved.render ?? 0) < 5 && saved.landing) delete saved.landing.zoom;
   const [mode, setMode] = useState<Mode>(saved.mode ?? 'studio');
   const [ps, setPs] = useState<Record<Mode, CoinParams>>({
     studio: { ...DEFAULTS, ...saved.studio },
@@ -142,15 +144,15 @@ export default function App() {
     };
   }, [mode]);
 
-  /** Landing page: keep the coins clear of the hero. The ring's arc starts just under the button and sweeps off the
-   *  bottom; the other shapes are scaled and centred in the band between the button and the bottom of the page. */
+  /** Landing page: keep the coins clear of the hero. The highest coin sits just under the button and the rest runs off
+   *  the bottom; the zoom is left as it is, so the coins keep their size. */
   const fitBelowText = (next: CoinParams = p) => {
     const s = scene.current, cta = document.querySelector('.lp-hero > .lp-btn'), stage = landingHost.current;
     if (!s || !cta || !stage) return e(next);
     const st = stage.getBoundingClientRect();
     const top = cta.getBoundingClientRect().bottom - st.top + 28;
     const bottom = st.height - 70; // leave the stage bar its room
-    e({ ...next, ...s.fitLanding(next, top, bottom, next.shape === 'ring' ? 'top' : 'band') });
+    e({ ...next, ...s.fitLanding(next, top, bottom, 'top') }); // move only: the zoom (89% by default) is never changed
   };
   const host = () => (mode === 'studio' ? studioHost.current : landingHost.current);
 
@@ -167,7 +169,7 @@ export default function App() {
   useEffect(() => {
     // the landing page's coins render on the page's own colour, so the photographic passes (which need an opaque frame) work there too
     scene.current?.set(mode === 'landing' ? { ...p, background: themed(page).bg } : p);
-    store.set(KEY, { mode, studio: ps.studio, landing: ps.landing, page, aspect, render: 4 });
+    store.set(KEY, { mode, studio: ps.studio, landing: ps.landing, page, aspect, render: 5 });
   }, [p, ps, page, mode, aspect]);
 
   useEffect(() => scene.current?.setPaused(paused), [paused]);
@@ -328,7 +330,7 @@ export default function App() {
                 <SliderRow label="Zoom" value={p.zoom} min={0.4} max={5} step={0.01} onChange={(v) => e({ zoom: v })} format={(v) => `${Math.round(v * 100)}%`} />
                 <SliderRow label="Coin size" value={p.size} min={0.4} max={3} step={0.01} onChange={(v) => e({ size: v })} format={(v) => v.toFixed(2)} />
                 <button className="btn-panel" onClick={() => fitBelowText()}>Keep clear of text</button>
-                <p className="rl-note">Drag the coins on the page to move them. Pinch to zoom; hold Option (⌥) and scroll to bring them nearer or further. Keep clear of text tucks them under the button (picking a shape does this too); after that, everything is yours to change.</p>
+                <p className="rl-note">Drag the coins on the page to move them. Pinch to zoom; hold Option (⌥) and scroll to bring them nearer or further. Keep clear of text tucks them under the button without changing their size (picking a shape does this too); after that, everything is yours to change.</p>
               </Group>
             )}
 
