@@ -16,7 +16,7 @@ export const FINISHES: Record<Finish, { color: string; rough: number; metal: num
   silver: { color: '#d8dade', rough: 0.15, metal: 1, irid: 0 },
   chrome: { color: '#eceef2', rough: 0.05, metal: 1, irid: 0 },
   graphite: { color: '#5d6066', rough: 0.3, metal: 1, irid: 0 },
-  gold: { color: '#e6be7a', rough: 0.22, metal: 1, irid: 0 }, // deep, warm, polished: highlights go near-white on their own
+  gold: { color: '#e6be7a', rough: 0.22, metal: 1, irid: 0 },
   coral: { color: '#ec6a52', rough: 0.3, metal: 0.85, irid: 0 },
   violet: { color: '#b48cff', rough: 0.26, metal: 0.9, irid: 1 },
   granite: { color: '#c4c3bf', rough: 0.62, metal: 0, irid: 0, stone: 'granite' },
