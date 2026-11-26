@@ -128,7 +128,7 @@ interface Saved {
   page?: Partial<LandingParams>;
   aspect?: Aspect;
   render?: number;
-  brand?: string; // set once the Camba → Fidda rename has been applied
+  brand?: string; // set once the Fidda → Camba switch has been applied
   at?: number; // when it was saved: the newer of the browser's copy and the project file wins // version of the render defaults the saved settings were made with
 }
 
@@ -142,8 +142,8 @@ export default function App() {
   if ((saved.render ?? 0) < 5 && saved.landing) delete saved.landing.zoom;
   // once: glints briefly defaulted to on; that was the default, not a choice, so clear it
   if ((saved.render ?? 0) < 6) for (const k of ['studio', 'landing'] as const) delete (saved[k] as Record<string, unknown> | undefined)?.glints;
-  // once: the brand became Fidda
-  if ((saved.render ?? 0) < 7 && saved.page?.text?.logo === 'Camba') saved.page.text.logo = 'Fidda';
+  // once: the brand is Camba again (the real logo), not the Fidda wordmark
+  if (saved.brand !== 'camba' && saved.page?.text?.logo === 'Fidda') saved.page.text.logo = 'Camba';
   fixFinishes(saved.studio);
   fixFinishes(saved.landing);
   const [mode, setMode] = useState<Mode>(saved.mode ?? 'studio');
@@ -242,9 +242,9 @@ export default function App() {
   };
   const host = () => (mode === 'studio' ? studioHost.current : landingHost.current);
 
-  // once, even in a tab that's already open: the brand is Fidda now (a later deliberate rename to Camba is left alone)
+  // once, even in a tab that's already open: the brand is Camba now (a later deliberate rename is left alone)
   useEffect(() => {
-    if (store.get<Saved>(KEY, {}).brand !== 'fidda') setPage((pg) => (pg.text.logo === 'Camba' ? { ...pg, text: { ...pg.text, logo: 'Fidda' } } : pg));
+    if (store.get<Saved>(KEY, {}).brand !== 'camba') setPage((pg) => (pg.text.logo === 'Fidda' ? { ...pg, text: { ...pg.text, logo: 'Camba' } } : pg));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -262,7 +262,7 @@ export default function App() {
     // the landing page's coins render on the page's own colour, so the photographic passes (which need an opaque frame) work there too
     scene.current?.set(mode === 'landing' ? { ...p, background: themed(page).bg } : p);
     if (!hydrated.current) return; // don't save the defaults over the project file before it has been read
-    const data: Saved = { mode, studio: ps.studio, landing: ps.landing, page, aspect, render: 7, brand: 'fidda', at: Date.now() };
+    const data: Saved = { mode, studio: ps.studio, landing: ps.landing, page, aspect, render: 7, brand: 'camba', at: Date.now() };
     store.set(KEY, data);
     // also to settings.local.json in the project (while developing), shortly after the last change
     clearTimeout(saveTimer.current);
@@ -282,7 +282,7 @@ export default function App() {
       .then((r) => (r.ok ? r.json() : {}))
       .then((f: Saved) => {
         if (f && f.at && (f.render ?? 0) < 6) for (const k of ['studio', 'landing'] as const) delete (f[k] as Record<string, unknown> | undefined)?.glints;
-        if (f && f.at && (f.render ?? 0) < 7 && f.page?.text?.logo === 'Camba') f.page.text.logo = 'Fidda';
+        if (f && f.at && f.brand !== 'camba' && f.page?.text?.logo === 'Fidda') f.page.text.logo = 'Camba';
         fixFinishes(f?.studio);
         fixFinishes(f?.landing);
         if (f && f.at && (!saved.at || f.at > saved.at)) {

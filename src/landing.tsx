@@ -105,7 +105,7 @@ export const LANDING: LandingParams = {
   buttonHeight: 52,
   showNav: true,
   text: {
-    logo: 'Fidda', // فضة: silver
+    logo: 'Camba',
     nav: 'Credit Card, Accounts, Loan, Resource',
     signIn: 'Sign in',
     open: 'Open Account',
@@ -311,13 +311,13 @@ export function Landing({ l, onText, onPage, onDrag, children }: {
           <span className="lp-logo">
             {t.logo === 'Camba' ? (
               // the real logo; double-click it to type a different name next to the mark
-              <span onDoubleClick={() => onText({ logo: 'Fidda' })} title="Double-click to rename">
+              <span onDoubleClick={() => onText({ logo: 'Brand' })} title="Double-click to rename">
                 <CambaLogo color={c.ink} />
               </span>
             ) : (
               <>
-                {/* any other name: a wordmark in the display face (the Camba mark belongs to Camba, so it isn't used here) */}
-                <Edit id="logo" className="lp-wordmark" value={t.logo} onChange={(v) => onText({ logo: v || 'Fidda' })} />
+                {/* any other name: a wordmark in the display face; clear it to get the Camba logo back */}
+                <Edit id="logo" className="lp-wordmark" value={t.logo} onChange={(v) => onText({ logo: v || 'Camba' })} />
               </>
             )}
           </span>
